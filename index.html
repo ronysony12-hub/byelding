@@ -1,0 +1,2921 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Diário Pro - Gestão de Obras</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
+        import { getDatabase, ref, set, onValue, push, update, remove } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-database.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBwYCjvBHi5FaxNXX62uK4LDvERULXMAII",
+            authDomain: "diariopro-obra.firebaseapp.com",
+            databaseURL: "https://diariopro-obra-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "diariopro-obra",
+            storageBucket: "diariopro-obra.firebasestorage.app",
+            messagingSenderId: "666449553175",
+            appId: "1:666449553175:web:e302ac205934de219a7952"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const auth = getAuth(app);
+        
+        window.db = db;
+        window.auth = auth;
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('app-container').style.display = 'flex';
+            } else {
+                document.getElementById('login-screen').style.display = 'flex';
+                document.getElementById('app-container').style.display = 'none';
+            }
+        });
+    </script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        /* --- DESIGNER E CSS ORIGINAIS (INTACTOS) --- */
+        :root {
+            --primary: #475569;
+            --secondary: #f8fafc;
+            --accent: #3b82f6;
+            --bg: #f1f5f9;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --white: #ffffff;
+            --success: #10b981;
+            --danger: #ef4444;
+            --border: #e2e8f0;
+            --radius: 12px;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', system-ui, sans-serif; }
+        body { background-color: var(--bg); color: var(--text-main); height: 100vh; width: 100vw; overflow: hidden; display: flex; transition: all 0.3s; }
+
+        /* Login */
+        #login-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at top left, #f1f5f9, #e2e8f0);
+            display: flex; justify-content: center; align-items: center; z-index: 2000;
+        }
+        .login-box {
+            background: var(--white); padding: 2.5rem; border-radius: var(--radius);
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); width: 100%; max-width: 400px;
+        }
+
+        /* Responsividade Mobile e Toggle do Menu */
+        #app-container { display: none; width: 100%; height: 100%; }
+        
+        body.sidebar-closed .sidebar { margin-left: -260px; }
+        
+        @media (max-width: 768px) {
+            body { flex-direction: column; overflow-y: auto; height: auto; }
+            .sidebar { width: 100% !important; height: auto !important; border-right: none !important; border-bottom: 1px solid var(--border); padding: 15px !important; margin-left: 0 !important; }
+            body.sidebar-closed .sidebar { display: none; } 
+            .main-content { padding: 20px !important; overflow-y: visible !important; }
+            .form-grid { grid-template-columns: 1fr !important; }
+            .full-width { grid-column: span 1 !important; }
+            table { display: block; overflow-x: auto; white-space: nowrap; }
+        }
+
+        .sidebar {
+            width: 260px; background: var(--white); border-right: 1px solid var(--border);
+            display: flex; flex-direction: column; padding: 24px; flex-shrink: 0;
+            overflow-y: auto; transition: margin-left 0.3s ease;
+        }
+        .sidebar h2 { font-size: 1.25rem; color: var(--accent); margin-bottom: 1.5rem; display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+        .sidebar-toggle-btn { cursor: pointer; color: var(--text-muted); font-size: 1.1rem; transition: 0.2s; }
+        .sidebar-toggle-btn:hover { color: var(--accent); }
+        
+        .sidebar-tabs {
+            display: flex; gap: 5px; margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 10px;
+            flex-wrap: wrap; 
+        }
+
+        .sidebar-tab-btn {
+            flex: 1; padding: 8px 12px; text-align: center; cursor: pointer; border-radius: 6px; 
+            font-size: 1.2rem; color: var(--text-muted); transition: 0.2s; background: var(--secondary);
+            border: 1px solid transparent; min-width: 40px;
+        }
+        .sidebar-tab-btn.active { background: var(--accent); color: white; box-shadow: var(--shadow); }
+        .sidebar-tab-btn:hover:not(.active) { background: #e2e8f0; }
+        
+        .menu-group { display: none; animation: fadeIn 0.3s ease; }
+        .menu-group.active { display: block; }
+
+        .menu-item {
+            padding: 12px 16px; margin-bottom: 4px; cursor: pointer; border-radius: 8px;
+            display: flex; align-items: center; color: var(--text-muted); transition: 0.2s; font-weight: 500;
+        }
+        .menu-item i { width: 24px; }
+        .menu-item:hover, .menu-item.active { background: #eff6ff; color: var(--accent); }
+        .logout-btn { margin-top: auto; color: var(--danger); border: 1px solid #fee2e2; }
+
+        .submenu-container { display: none; animation: fadeIn 0.3s ease; }
+        .submenu-item {
+            padding: 10px 16px 10px 40px; margin-bottom: 2px; cursor: pointer; border-radius: 8px;
+            display: flex; align-items: center; color: var(--text-muted); font-size: 0.9rem;
+            background-color: #f8fafc; border-left: 3px solid transparent;
+        }
+        .submenu-item:hover { background-color: #e2e8f0; color: var(--accent); border-left: 3px solid var(--accent); }
+        .submenu-item.active { background-color: #cbd5e1; color: var(--text-main); border-left: 3px solid var(--accent); }
+
+        .main-content { flex: 1; padding: 40px; overflow-y: auto; overflow-x: auto; }
+        .main-content::-webkit-scrollbar { height: 10px; }
+        .main-content::-webkit-scrollbar-track { background: #f1f1f1; }
+        .main-content::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 5px; }
+
+        .section { display: none; max-width: 1000px; margin: 0 auto; animation: fadeIn 0.4s ease; }
+        .section.active { display: block; }
+
+        .card { background: var(--white); padding: 25px; border-radius: var(--radius); box-shadow: var(--shadow); border: 1px solid var(--border); margin-bottom: 20px; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem; }
+        input, select, textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; outline-color: var(--accent); }
+        .full-width { grid-column: span 2; }
+
+        .equip-container {
+            max-height: 300px; overflow-y: auto; border: 1px solid var(--border);
+            padding: 15px; border-radius: 8px; background: #fafafa;
+        }
+        .equip-group-title { font-weight: bold; font-size: 0.85rem; color: var(--accent); border-bottom: 1px solid #ddd; margin-top: 10px; margin-bottom: 8px; display: block; padding-bottom: 5px; }
+        .equip-item { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; margin-bottom: 4px; cursor: pointer; }
+        .equip-item input { width: auto; }
+
+        .photo-preview { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+        .signature-pad { border: 1px solid var(--border); background: #fafafa; border-radius: 8px; width: 100%; height: 150px; cursor: crosshair; touch-action: none; }
+        
+        .btn {
+            background: var(--accent); color: white; border: none; padding: 10px 20px;
+            border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s;
+        }
+        .btn-danger { background: var(--danger); }
+        .btn-warning { background: #f59e0b; }
+        .btn-success { background: var(--success); }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { text-align: left; padding: 12px; background: var(--secondary); color: var(--text-muted); font-size: 0.8rem; }
+        td { padding: 12px; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+
+        #print-modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 3000; overflow-y: auto; padding: 20px;
+        }
+        .modal-content { background: white; max-width: 900px; margin: 0 auto; padding: 40px; border-radius: 8px; }
+
+        #justification-modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); z-index: 4000;
+            justify-content: center; align-items: center;
+        }
+        .justification-content {
+            background: var(--white); width: 90%; max-width: 450px; padding: 25px; border-radius: var(--radius);
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); animation: fadeIn 0.3s ease;
+        }
+        .justification-content h3 { color: var(--primary); margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
+        .justification-content p { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 10px; }
+        
+        #reopen-sidebar-btn {
+            position: fixed; top: 20px; left: 20px; z-index: 1000;
+            background: var(--white); padding: 10px; border-radius: 50%;
+            box-shadow: var(--shadow); cursor: pointer; display: none;
+            color: var(--accent); border: 1px solid var(--border);
+        }
+        body.sidebar-closed #reopen-sidebar-btn { display: block; }
+
+        /* --- CSS PARA O COMPONENTE DE SELEÇÃO MÚLTIPLA COM PESQUISA (ADMIN) --- */
+        .custom-select-container { position: relative; width: 100%; }
+        
+        .select-btn {
+            display: flex; justify-content: space-between; align-items: center;
+            width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px;
+            background: #fff; cursor: pointer; font-size: 0.9rem; color: var(--text-main);
+        }
+        
+        .select-btn .btn-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        .dropdown-content {
+            display: none; position: absolute; top: 110%; left: 0; width: 100%;
+            background: #fff; border: 1px solid var(--border); border-radius: 8px;
+            box-shadow: var(--shadow); z-index: 99; padding: 10px;
+        }
+        
+        .dropdown-content.show { display: block; }
+        
+        .search-box {
+            width: 100%; padding: 8px; border: 1px solid var(--border);
+            border-radius: 6px; margin-bottom: 10px; font-size: 0.85rem;
+        }
+        
+        .options-list { max-height: 150px; overflow-y: auto; }
+        
+        .option-item {
+            display: flex; align-items: center; gap: 8px; padding: 6px;
+            cursor: pointer; border-radius: 4px; transition: 0.2s;
+        }
+        .option-item:hover { background: #f1f5f9; }
+        .option-item input[type="checkbox"] { width: 16px; height: 16px; margin: 0; cursor: pointer; }
+        .option-item label { margin: 0; cursor: pointer; font-size: 0.9rem; width: 100%; }
+
+        /* --- CSS PARA OS GRUPOS DE USUÁRIOS --- */
+        .user-groups-container { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; margin-top: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border); }
+        .group-filter-btn {
+            padding: 6px 12px; border-radius: 20px; font-size: 0.85rem; cursor: pointer;
+            border: 1px solid var(--border); background: var(--white); color: var(--text-muted);
+            transition: 0.2s; display: flex; align-items: center; gap: 6px;
+        }
+        .group-filter-btn:hover { background: #f1f5f9; color: var(--accent); }
+        .group-filter-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+        .group-count { background: rgba(0,0,0,0.1); padding: 1px 6px; border-radius: 10px; font-size: 0.75rem; }
+
+        /* --- CSS PARA A LISTA DE OBRAS NO HOME --- */
+        .obra-card-home {
+            display: flex; align-items: center; gap: 15px;
+            padding: 15px; border: 1px solid var(--border);
+            border-radius: 8px; transition: 0.2s; cursor: pointer;
+            background: var(--white);
+        }
+        .obra-card-home:hover { border-color: var(--accent); box-shadow: var(--shadow); transform: translateY(-2px); }
+        .obra-img-thumb {
+            width: 80px; height: 80px; object-fit: cover;
+            border-radius: 6px; background: #e2e8f0;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--text-muted); font-size: 2rem;
+        }
+        .obra-info h4 { color: var(--text-main); margin-bottom: 5px; }
+        .obra-info p { color: var(--text-muted); font-size: 0.85rem; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body onload="init()">
+
+    <div id="reopen-sidebar-btn" onclick="toggleSidebar()" title="Abrir Menu"><i class="fas fa-bars"></i></div>
+
+    <div id="justification-modal">
+        <div class="justification-content">
+            <h3 id="justification-title"><i class="fas fa-exclamation-triangle"></i> Justificativa Necessária</h3>
+            <p>Por favor, explique o motivo desta ação (Edição/Exclusão):</p>
+            <textarea id="justification-text" rows="4" style="width: 100%; margin-bottom: 15px;" placeholder="Digite o motivo aqui..."></textarea>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button class="btn btn-danger" onclick="cancelJustification()">Cancelar</button>
+                <button class="btn btn-success" onclick="confirmJustification()">Confirmar Ação</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="login-screen">
+        <form class="login-box" onsubmit="event.preventDefault(); attemptLogin();">
+            <h2 style="text-align:center; color: var(--primary);">🏗️ Diário Pro</h2>
+            <p style="text-align:center; color: var(--text-muted); margin-bottom: 20px;">Gestão de Obras</p>
+            <input type="text" id="username" placeholder="Usuário" style="margin-bottom: 10px;" autocomplete="username">
+            <input type="password" id="password" placeholder="Senha" style="margin-bottom: 20px;" autocomplete="current-password">
+            <button class="btn" type="submit" style="width: 100%;">Aceder ao Sistema</button>
+            <p id="login-error" style="color: var(--danger); font-size: 0.8rem; text-align: center; margin-top: 10px; display: none;">Usuário ou senha incorretos.</p>
+        </form>
+    </div>
+
+    <div id="app-container">
+        <nav class="sidebar">
+            <h2>
+                <span><i class="fas fa-hard-hat"></i> DiárioPro</span>
+                <i class="fas fa-bars sidebar-toggle-btn" onclick="toggleSidebar()" title="Recolher Menu"></i>
+            </h2>
+            
+            <div class="sidebar-tabs">
+                <div id="tab-geral" class="sidebar-tab-btn active" onclick="switchMenu('geral')" title="Geral"><i class="fas fa-home"></i></div>
+                <div id="tab-fiscal" class="sidebar-tab-btn" onclick="switchMenu('fiscal')" title="Fiscal" style="display:none;"><i class="fas fa-clipboard-list"></i></div>
+                <div id="tab-engenharia" class="sidebar-tab-btn" onclick="switchMenu('engenharia')" title="Engenharia" style="display:none;"><i class="fas fa-hard-hat"></i></div>
+                <div id="tab-empreiteiro" class="sidebar-tab-btn" onclick="switchMenu('empreiteiro')" title="Empreiteiro" style="display:none;"><i class="fas fa-tools"></i></div>
+                <div id="tab-admin" class="sidebar-tab-btn" onclick="switchMenu('admin')" title="Admin" style="display:none;"><i class="fas fa-cogs"></i></div>
+                <div id="tab-almoxarifado" class="sidebar-tab-btn" onclick="switchMenu('almoxarifado')" title="Almoxarifado" style="display:none;"><i class="fas fa-boxes"></i></div>
+                <div id="tab-pedreiro" class="sidebar-tab-btn" onclick="switchMenu('pedreiro')" title="Pedreiro" style="display:none;"><i class="fas fa-trowel"></i></div>
+            </div>
+
+            <div id="menu-geral" class="menu-group active">
+                <div class="menu-item active" onclick="showSection('dashboard')"><i class="fas fa-th-large"></i> Painel</div>
+                <div id="menu-item-novo-rdo" class="menu-item" onclick="showSection('novo-rdo')"><i class="fas fa-pen-alt"></i> Novo RDO</div>
+                <div id="menu-item-viz-rdo" class="menu-item" onclick="showSection('historico')" style="display:none;"><i class="fas fa-check-square"></i> Visualizar RDOs</div>
+                <div id="menu-item-historico" class="menu-item" onclick="showSection('historico')"><i class="fas fa-history"></i> Histórico</div>
+            </div>
+            
+            <div id="menu-fiscal" class="menu-group">
+                <div style="margin-top: 5px; margin-bottom: 5px; font-size: 0.75rem; color: var(--text-muted); font-weight: bold; text-transform: uppercase;">Módulo Fiscal</div>
+                <div class="menu-item" onclick="showSection('checklists')"><i class="fas fa-check-double"></i> Checklists Digitais</div>
+                <div class="menu-item" onclick="showSection('sec-relatorios-fiscal')"><i class="fas fa-camera"></i> Relatórios de Campo</div>
+                
+                <div class="menu-item" onclick="showSection('medicoes')"><i class="fas fa-ruler-combined"></i> Medições e Relatórios</div>
+                <div class="menu-item" onclick="showSection('cronograma')"><i class="fas fa-calendar-alt"></i> Controle de Cronograma</div>
+                <div class="menu-item" onclick="showSection('eng-comunicacao')"><i class="fas fa-comments"></i> Comunicação</div>
+            </div>
+
+            <div id="menu-engenharia" class="menu-group">
+                <div style="margin-top: 5px; margin-bottom: 5px; font-size: 0.75rem; color: var(--text-muted); font-weight: bold; text-transform: uppercase;">Módulo Engenharia</div>
+                <div class="menu-item" onclick="toggleSubmenu('submenu-termo', 'sec-tap')">
+                    <i class="fas fa-file-invoice"></i> Termo de Abertura <i class="fas fa-caret-down" style="margin-left: auto;"></i>
+                </div>
+                <div id="submenu-termo" class="submenu-container">
+                      <div class="submenu-item" onclick="showSection('sec-tap')"><i class="fas fa-file-invoice" style="margin-right: 8px;"></i> Termo de Abertura do Projeto (TAP)</div>
+                      <div class="submenu-item" onclick="showSection('sec-contrato-prof')"><i class="fas fa-file-contract" style="margin-right: 8px;"></i> Cadastro de Contrato Profissional</div>
+                      <div class="submenu-item" onclick="showSection('eng-contratante')"><i class="fas fa-user-tie" style="margin-right: 8px;"></i> Cadastro Contratante</div>
+                      <div class="submenu-item" onclick="showSection('eng-dados-obra')"><i class="fas fa-building" style="margin-right: 8px;"></i> Dados da Obra/Serviço</div>
+                      <div class="submenu-item" onclick="showSection('eng-observacao')"><i class="fas fa-edit" style="margin-right: 8px;"></i> Observação - Obra ou serviço</div>
+                </div>
+                
+                <div class="menu-item" onclick="showSection('aprovacao')"><i class="fas fa-user-check"></i> Fluxo de Aprovação</div>
+                
+                <div id="menu-eng-materiais" class="menu-item" onclick="showSection('eng-materiais')"><i class="fas fa-boxes"></i> Controle Materiais</div>
+                <div id="menu-eng-execucao" class="menu-item" onclick="showSection('eng-execucao')"><i class="fas fa-drafting-compass"></i> Execução Técnica</div>
+                <div id="menu-eng-qualidade" class="menu-item" onclick="showSection('eng-qualidade')"><i class="fas fa-clipboard-check"></i> Controle Qualidade</div>
+                <div id="menu-eng-custos" class="menu-item" onclick="showSection('eng-custos')"><i class="fas fa-wallet"></i> Gestão de Custos</div>
+                <div id="menu-eng-relatorios" class="menu-item" onclick="showSection('eng-relatorios')"><i class="fas fa-file-invoice"></i> Relatórios Auto</div>
+                <div class="menu-item" onclick="showSection('eng-comunicacao')"><i class="fas fa-comments"></i> Comunicação</div>
+                <div class="menu-item" onclick="showSection('eng-seguranca')"><i class="fas fa-shield-alt"></i> Segurança (SMS)</div>
+                <div class="menu-item" onclick="showSection('eng-dashboard')"><i class="fas fa-chart-line"></i> Dash Desempenho</div>
+            </div>
+
+            <div id="menu-admin" class="menu-group">
+                <div style="margin-top: 5px; margin-bottom: 5px; font-size: 0.75rem; color: var(--text-muted); font-weight: bold; text-transform: uppercase;">Administração</div>
+                <div class="menu-item" onclick="showSection('gestao')"><i class="fas fa-user-shield"></i> Gestão de Obras</div>
+                <div class="menu-item" onclick="showSection('configuracoes')"><i class="fas fa-cog"></i> Administração do Sistema</div>
+                <div id="menu-item-logs" class="menu-item" onclick="showSection('admin-logs')"><i class="fas fa-clipboard-list"></i> Auditoria (Logs)</div>
+            </div>
+
+            <div id="menu-empreiteiro" class="menu-group">
+                <div style="margin-top: 5px; margin-bottom: 5px; font-size: 0.75rem; color: var(--text-muted); font-weight: bold; text-transform: uppercase;">Módulo Empreiteiro</div>
+                <div class="menu-item" onclick="showSection('eng-materiais')"><i class="fas fa-boxes"></i> Controle Materiais</div>
+                <div class="menu-item" onclick="showSection('eng-execucao')"><i class="fas fa-drafting-compass"></i> Execução Técnica</div>
+                <div class="menu-item" onclick="showSection('eng-qualidade')"><i class="fas fa-clipboard-check"></i> Controle Qualidade</div>
+                <div class="menu-item" onclick="showSection('eng-custos')"><i class="fas fa-wallet"></i> Gestão de Custos</div>
+                <div class="menu-item" onclick="showSection('eng-relatorios')"><i class="fas fa-file-invoice"></i> Relatórios Auto</div>
+            </div>
+
+            <div id="menu-almoxarifado" class="menu-group">
+                <div style="margin-top: 5px; margin-bottom: 5px; font-size: 0.75rem; color: var(--text-muted); font-weight: bold; text-transform: uppercase;">Almoxarifado</div>
+                <div class="menu-item" onclick="showSection('alm-estoque')"><i class="fas fa-boxes"></i> Gestão de Estoque</div>
+                <div class="menu-item" onclick="showSection('alm-controle')"><i class="fas fa-exchange-alt"></i> Devoluções e Empréstimos</div>
+            </div>
+
+            <div id="menu-pedreiro" class="menu-group">
+                <div style="margin-top: 5px; margin-bottom: 5px; font-size: 0.75rem; color: var(--text-muted); font-weight: bold; text-transform: uppercase;">Operacional</div>
+                <div class="menu-item" onclick="showSection('ped-solicitacao')"><i class="fas fa-hand-holding"></i> Solicitar Materiais/EPI</div>
+                <div class="menu-item" onclick="showSection('ped-ferramentas')"><i class="fas fa-tools"></i> Minhas Ferramentas</div>
+            </div>
+
+            <div class="menu-item logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Sair</div>
+        </nav>
+
+        <main class="main-content">
+            
+            <div id="dashboard" class="section active">
+                <h2 style="margin-bottom: 20px;">Painel de Controle</h2>
+                <div class="form-grid" style="grid-template-columns: repeat(2, 1fr);">
+                    <div class="card"><h3 id="dash-obras">0</h3><p style="font-size: 0.8rem;">Obras Ativas</p></div>
+                    <div class="card"><h3>100%</h3><p style="font-size: 0.8rem;">Sincronizado</p></div>
+                </div>
+                <div id="dash-fiscal-indicadores" class="card" style="display:none;">
+                    <h4>Painel de Indicadores (Dashboard Fiscal)</h4>
+                    <canvas id="chartFiscal" style="max-height: 200px; margin-top:15px;"></canvas>
+                </div>
+                
+                <div class="card" style="margin-top: 20px;">
+                    <h4 style="margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+                        <i class="fas fa-building" style="color: var(--accent);"></i> Escolha sua Obra
+                    </h4>
+                    <div id="lista-obras-home" style="display: flex; flex-direction: column; gap: 15px;">
+                        <p style="text-align: center; color: var(--text-muted);">Nenhuma obra disponível.</p>
+                    </div>
+                </div>
+
+            </div>
+
+            <div id="sec-relatorios-fiscal" class="section">
+                <h2>Relatórios de Campo</h2>
+                
+                <div class="card">
+                    <h4>Relatório Fotográfico com GPS</h4>
+                    <input type="hidden" id="edit-foto-index" value="-1">
+                    <div class="form-grid">
+                        <div class="form-group full-width"><label>Obra Vinculada</label><select id="foto-gps-obra"></select></div>
+                        
+                        <div class="form-group full-width"><label>Descrição / Título</label><input type="text" id="foto-gps-desc" placeholder="Ex: Abertura de Valas"></div>
+                        <div class="form-group">
+                            <label>Coordenadas GPS</label>
+                            <div style="display:flex; gap:5px;">
+                                <input type="text" id="foto-gps-coords" placeholder="Lat, Long" readonly>
+                                <button class="btn btn-warning" onclick="obterGPS()"><i class="fas fa-map-marker-alt"></i></button>
+                            </div>
+                        </div>
+                        <div class="form-group"><label>Data</label><input type="date" id="foto-gps-data"></div>
+                        <div class="form-group full-width"><label>Fotos</label><input type="file" multiple accept="image/*" id="foto-gps-files"></div>
+                    </div>
+                    
+                    <div class="full-width" style="display: flex; gap: 10px; margin-top: 15px;">
+                        <button class="btn btn-success" id="btn-salvar-foto-gps" onclick="salvarFotoGPS()"><i class="fas fa-save"></i> Salvar Relatório</button>
+                        <button class="btn btn-danger" id="btn-cancelar-foto-gps" onclick="cancelarEdicaoFotoGPS()" style="display: none;">Cancelar</button>
+                    </div>
+
+                    <table style="width: 100%; margin-top: 20px;">
+                        <thead><tr><th>Obra</th><th>Descrição</th><th>Data</th><th>GPS</th><th>Ações</th></tr></thead>
+                        <tbody id="lista-fotos-gps"></tbody>
+                    </table>
+                </div>
+
+                <div class="card">
+                    <h4>Ocorrência Técnica</h4>
+                    <input type="hidden" id="edit-ocorrencia-index" value="-1">
+                    <div class="form-grid">
+                        <div class="form-group full-width"><label>Obra Vinculada</label><select id="ocorrencia-obra"></select></div>
+
+                        <div class="form-group"><label>Assunto</label><input type="text" id="ocorrencia-assunto" placeholder="Ex: Falha no concreto"></div>
+                        <div class="form-group"><label>Data da Ocorrência</label><input type="date" id="ocorrencia-data"></div>
+                        <div class="form-group full-width"><label>Observação</label><textarea id="ocorrencia-obs" rows="4" placeholder="Descreva os detalhes da ocorrência técnica..."></textarea></div>
+                    </div>
+
+                    <div class="full-width" style="display: flex; gap: 10px; margin-top: 15px;">
+                        <button class="btn btn-success" id="btn-salvar-ocorrencia" onclick="salvarOcorrencia()"><i class="fas fa-save"></i> Salvar Ocorrência</button>
+                        <button class="btn btn-danger" id="btn-cancelar-ocorrencia" onclick="cancelarEdicaoOcorrencia()" style="display: none;">Cancelar</button>
+                    </div>
+
+                    <table style="width: 100%; margin-top: 20px;">
+                        <thead><tr><th>Obra</th><th>Assunto</th><th>Data</th><th>Ações</th></tr></thead>
+                        <tbody id="lista-ocorrencias"></tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div id="admin-logs" class="section">
+                <h2>Histórico de Edições e Exclusões (Auditoria)</h2>
+                <div class="card">
+                    <p style="margin-bottom: 15px; font-size: 0.9rem; color: var(--text-muted);">
+                        Este painel exibe todas as justificativas registradas pelos usuários ao editar ou excluir registros no sistema.
+                    </p>
+                    <table style="width: 100%;">
+                        <thead>
+                            <tr>
+                                <th>Data/Hora</th>
+                                <th>Usuário</th>
+                                <th>Ação</th>
+                                <th>Justificativa</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-logs"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="novo-rdo" class="section">
+                <h2>Registar Atividade</h2>
+                <form id="form-rdo" onsubmit="salvarRDO(event)" class="card" autocomplete="on">
+                    <input type="hidden" id="rdo-edit-index" value="-1">
+                    <div class="form-grid">
+                        <div class="form-group full-width"><label>Obra</label><select id="rdo-obra" required></select></div>
+                        <div class="form-group"><label>Data</label><input type="date" id="rdo-data" required></div>
+                        <div class="form-group"><label>Qtd. Funcionários</label><input type="number" id="rdo-qtd" required></div>
+                        <div class="form-group full-width">
+                            <label>Equipamentos</label>
+                            <div class="equip-container" id="rdo-equipamentos">
+                                <span class="equip-group-title">1. Movimentação de Terra</span>
+                                <label class="equip-item"><input type="checkbox" value="Escavadeira hidráulica"> Escavadeira hidráulica</label>
+                                <label class="equip-item"><input type="checkbox" value="Retroescavadeira"> Retroescavadeira</label>
+                                <label class="equip-item"><input type="checkbox" value="Pá carregadeira"> Pá carregadeira</label>
+                                <label class="equip-item"><input type="checkbox" value="Motoniveladora"> Motoniveladora</label>
+                                <label class="equip-item"><input type="checkbox" value="Trator de esteira"> Trator de esteira</label>
+                                <label class="equip-item"><input type="checkbox" value="Rolo compactador"> Rolo compactador</label>
+                                <label class="equip-item"><input type="checkbox" value="Caminhão basculante"> Caminhão basculante</label>
+                                <label class="equip-item"><input type="checkbox" value="Mini escavadeira"> Mini escavadeira</label>
+                                <label class="equip-item"><input type="checkbox" value="Betoneira"> Betoneira</label>
+                                <label class="equip-item"><input type="checkbox" value="Guindaste"> Guindaste</label>
+                                <label class="equip-item"><input type="checkbox" value="Serra circular"> Serra circular</label>
+                                <label class="equip-item"><input type="checkbox" value="Andaimes tubulares"> Andaimes tubulares</label>
+                            </div>
+                        </div>
+                        <div class="form-group"><label>Tempo (Manhã)</label><select id="rdo-tempo-m"><option>Sol</option><option>Nublado</option><option>Chuva</option></select></div>
+                        <div class="form-group"><label>Tempo (Tarde)</label><select id="rdo-tempo-t"><option>Sol</option><option>Nublado</option><option>Chuva</option></select></div>
+                        <div class="form-group full-width"><label>Tempo (Noite)</label><select id="rdo-tempo-n"><option>Sol</option><option>Nublado</option><option>Chuva</option></select></div>
+                        <div class="form-group full-width"><label>Terceirizada</label><input type="text" id="rdo-terc-nome"></div>
+                        <div class="form-group"><label>Qtd. Terc.</label><input type="number" id="rdo-terc-qtd"></div>
+                        <div class="form-group"><label>Serviços Terc.</label><input type="text" id="rdo-terc-serv"></div>
+                        <div class="form-group full-width"><label>Fotos</label><input type="file" multiple accept="image/*" id="rdo-fotos"></div>
+                        <div class="form-group full-width"><label>Relato</label><textarea id="rdo-detalhes" rows="5" required></textarea></div>
+                        <div class="form-group full-width"><label>Assinatura</label><canvas id="signature-pad-rdo" class="signature-pad"></canvas><button type="button" class="btn" onclick="limparAssinatura('signature-pad-rdo')">Limpar</button></div>
+                        <div class="form-group full-width"><label>Responsável</label><input type="text" id="rdo-resp" required></div>
+                    </div>
+                    <button type="submit" class="btn" id="btn-gravar-rdo" style="margin-top: 20px; width: 100%;">Gravar</button>
+                    <button type="button" id="btn-cancelar-rdo" class="btn btn-danger" style="margin-top: 10px; width: 100%; display: none;" onclick="cancelarEdicaoRDO()">Cancelar</button>
+                </form>
+            </div>
+
+            <div id="historico" class="section">
+                <h2>Histórico de Registos</h2>
+                <div class="card" style="padding: 0;"><table id="tabela-historico"><thead><tr><th>Data</th><th>Tipo</th><th>Descrição/Obra</th><th>Ações</th></tr></thead><tbody id="corpo-historico"></tbody></table></div>
+            </div>
+            
+            <div id="sec-tap" class="section">
+                <h2>Termo de Abertura</h2> 
+                <div class="card" style="border-top: 5px solid var(--accent);">
+                    <h4 style="margin-bottom: 20px; color: var(--primary); border-bottom: 1px solid #eee; padding-bottom: 10px;"><i class="fas fa-file-invoice"></i> Termo de Abertura do Projeto (TAP)</h4>
+                    <div class="form-grid" id="form-tap-content">
+                        <div class="form-group full-width"><label>Nome do Projeto</label><input type="text" id="tap-nome" placeholder="Digite o nome do projeto"></div>
+                        <div class="form-group"><label>Gerente do Projeto</label><input type="text" id="tap-gerente" placeholder="Nome do responsável"></div>
+                        <div class="form-group"><label>Patrocinador (Sponsor)</label><input type="text" id="tap-sponsor" placeholder="Quem financia/aprova"></div>
+                        <div class="form-group full-width"><label>Justificativa do Projeto</label><textarea id="tap-justificativa" rows="3" placeholder="Por que este projeto está sendo criado?"></textarea></div>
+                        <div class="form-group full-width"><label>Objetivos do Projeto</label><textarea id="tap-objetivos" rows="3" placeholder="O que deve ser alcançado?"></textarea></div>
+                        <div class="form-group full-width"><label>Premissas e Restrições</label><textarea id="tap-premissas" rows="3"></textarea></div>
+                        <div class="form-group full-width"><label>Principais Stakeholders</label><textarea id="tap-stakeholders" rows="2" placeholder="Partes interessadas"></textarea></div>
+                        <div class="form-group"><label>Estimativa de Orçamento (R$)</label><input type="number" id="tap-orcamento" step="0.01"></div>
+                        <div class="form-group"><label>Estimativa de Prazo (Meses)</label><input type="number" id="tap-prazo"></div>
+                    </div>
+                    <div id="btns-tap" style="margin-top:20px; display: none; gap: 10px;">
+                        <button class="btn btn-success" onclick="salvarTAP()"><i class="fas fa-save"></i> Salvar</button>
+                        <button class="btn btn-warning" onclick="carregarTAP(true)"><i class="fas fa-edit"></i> Editar</button>
+                        <button class="btn btn-danger" onclick="excluirTAP()"><i class="fas fa-trash"></i> Excluir</button>
+                        <button class="btn" style="background: #475569; margin-left: 5px;" onclick="imprimirDiv('sec-tap', 'Termo de Abertura')"><i class="fas fa-print"></i> Imprimir</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="sec-contrato-prof" class="section">
+                <h2>Cadastro de Contrato</h2>
+                <div class="card" style="border-top: 5px solid var(--success);">
+                    <h4 style="margin-bottom: 20px; color: var(--primary); border-bottom: 1px solid #eee; padding-bottom: 10px;"><i class="fas fa-file-contract"></i> Cadastro de Contrato Profissional</h4>
+                    <div class="form-grid">
+                        <div class="form-group full-width"><label>NOME DO PROFISSIONAL</label><input type="text" id="contrato-nome" placeholder="Nome completo"></div>
+                        <div class="form-group"><label>TÍTULO</label><input type="text" id="contrato-titulo" placeholder="Ex: Engenheiro Civil"></div>
+                        <div class="form-group"><label>Nº DO CREA-UF \ VISTO</label><input type="text" id="contrato-crea" placeholder="000000000-0"></div>
+                        <div class="form-group"><label>Nº DO RG</label><input type="text" id="contrato-rg" placeholder="00.000.000-00"></div>
+                        <div class="form-group"><label>Nº DO CPF</label><input type="text" id="contrato-cpf" placeholder="000.000.000-00"></div>
+                        <div class="form-group full-width"><label>ENDEREÇO</label><input type="text" id="contrato-endereco" placeholder="Rua, número, complemento"></div>
+                        <div class="form-group"><label>BAIRRO</label><input type="text" id="contrato-bairro"></div>
+                        <div class="form-group"><label>CIDADE</label><input type="text" id="contrato-cidade"></div>
+                        <div class="form-group"><label>UF</label><input type="text" id="contrato-uf" maxlength="2" placeholder="Ex: SP"></div>
+                        <div class="form-group"><label>CEP</label><input type="text" id="contrato-cep" placeholder="00000-000"></div>
+                        <div class="form-group"><label>FONE</label><input type="text" id="contrato-fone" placeholder="(00) 0000-0000"></div>
+                        <div class="form-group"><label>CELULAR</label><input type="text" id="contrato-celular" placeholder="(00) 90000-0000"></div>
+                        <div class="form-group full-width"><label>E-MAIL</label><input type="email" id="contrato-email" placeholder="exemplo@email.com"></div>
+                    </div>
+                    <div id="btns-contrato" style="margin-top:20px; display: none; gap: 10px;">
+                        <button class="btn btn-success" onclick="salvarFormularioEspecifico('contrato')"><i class="fas fa-save"></i> Salvar</button>
+                        <button class="btn btn-warning" onclick="carregarFormularioEspecifico('contrato', true)"><i class="fas fa-edit"></i> Editar</button>
+                        <button class="btn btn-danger" onclick="excluirFormularioEspecifico('contrato')"><i class="fas fa-trash"></i> Excluir</button>
+                        <button class="btn" style="background: #475569; margin-left: 5px;" onclick="imprimirDiv('sec-contrato-prof', 'Contrato Profissional')"><i class="fas fa-print"></i> Imprimir</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="eng-contratante" class="section">
+                <h2>Cadastro do Contratante</h2>
+                <div class="card">
+                    <div class="form-grid">
+                        <div class="form-group full-width"><label>NOME DO CONTRATANTE</label><input type="text" id="contratante-nome" placeholder="Nome ou Razão Social"></div>
+                        <div class="form-group"><label>Nº DO RG/IE</label><input type="text" id="contratante-rg-ie" placeholder="RG ou Inscrição Estadual"></div>
+                        <div class="form-group"><label>Nº DO CPF/CNPJ</label><input type="text" id="contratante-cpf-cnpj" placeholder="CPF ou CNPJ"></div>
+                        <div class="form-group full-width"><label>ENDEREÇO</label><input type="text" id="contratante-endereco" placeholder="Rua, número, complemento"></div>
+                        <div class="form-group"><label>BAIRRO</label><input type="text" id="contratante-bairro"></div>
+                        <div class="form-group"><label>CIDADE</label><input type="text" id="contratante-cidade"></div>
+                        <div class="form-group"><label>UF</label><input type="text" id="contratante-uf" maxlength="2"></div>
+                        <div class="form-group"><label>CEP</label><input type="text" id="contratante-cep"></div>
+                        <div class="form-group"><label>FONE</label><input type="text" id="contratante-fone"></div>
+                        <div class="form-group"><label>CELULAR</label><input type="text" id="contratante-celular"></div>
+                        <div class="form-group full-width"><label>E-MAIL</label><input type="email" id="contratante-email"></div>
+                    </div>
+                    <div id="btns-contratante" style="margin-top:20px; display: none; gap: 10px;">
+                        <button class="btn btn-success" onclick="salvarFormularioEspecifico('contratante')"><i class="fas fa-save"></i> Salvar</button>
+                        <button class="btn btn-warning" onclick="carregarFormularioEspecifico('contratante', true)"><i class="fas fa-edit"></i> Editar</button>
+                        <button class="btn btn-danger" onclick="excluirFormularioEspecifico('contratante')"><i class="fas fa-trash"></i> Excluir</button>
+                        <button class="btn" style="background: #475569; margin-left: 5px;" onclick="imprimirDiv('eng-contratante', 'Cadastro Contratante')"><i class="fas fa-print"></i> Imprimir</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="eng-dados-obra" class="section">
+                <h2>DADOS DA OBRA/SERVIÇO</h2>
+                <div class="card">
+                    <div class="form-grid">
+                        <div class="form-group"><label>BAIRRO</label><input type="text" id="obra-bairro"></div>
+                        <div class="form-group"><label>CIDADE</label><input type="text" id="obra-cidade"></div>
+                        <div class="form-group"><label>UF</label><input type="text" id="obra-uf" maxlength="2"></div>
+                        <div class="form-group"><label>CEP</label><input type="text" id="obra-cep"></div>
+                        <div class="form-group full-width"><label>NATUREZA</label><input type="text" id="obra-natureza" placeholder="Ex: Construção Civil"></div>
+                        <div class="form-group"><label>QUANTIFICAÇÃO</label><input type="number" id="obra-quantificacao"></div>
+                        <div class="form-group"><label>UNIDADE</label><input type="text" id="obra-unidade" placeholder="Ex: m²"></div>
+                        <div class="form-group full-width"><label>DESCRIÇÃO DOS SERVIÇOS</label><textarea id="obra-descricao" rows="4"></textarea></div>
+                        <div class="form-group"><label>DATA DO CONTRATO</label><input type="date" id="obra-data-contrato"></div>
+                        <div class="form-group"><label>DATA DO INÍCIO</label><input type="date" id="obra-data-inicio"></div>
+                        <div class="form-group full-width"><label>DATA PROVÁVEL DA CONCLUSÃO</label><input type="date" id="obra-data-fim"></div>
+                        <div class="form-group full-width"><label>LOCAL E DATA</label><input type="text" id="obra-local-data" placeholder="Cidade, Data"></div>
+                        <div class="form-group full-width"><label>RESPONSÁVEL TÉCNICO ASS.</label><canvas id="signature-pad-resp" class="signature-pad"></canvas><button type="button" class="btn" onclick="limparAssinatura('signature-pad-resp')">Limpar</button></div>
+                        <div class="form-group full-width"><label>CONTRATANTE ASS.</label><canvas id="signature-pad-contratante" class="signature-pad"></canvas><button type="button" class="btn" onclick="limparAssinatura('signature-pad-contratante')">Limpar</button></div>
+                    </div>
+                    <div id="btns-obra" style="margin-top:20px; display: none; gap: 10px;">
+                        <button class="btn btn-success" onclick="salvarFormularioEspecifico('obra')"><i class="fas fa-save"></i> Salvar</button>
+                        <button class="btn btn-warning" onclick="carregarFormularioEspecifico('obra', true)"><i class="fas fa-edit"></i> Editar</button>
+                        <button class="btn btn-danger" onclick="excluirFormularioEspecifico('obra')"><i class="fas fa-trash"></i> Excluir</button>
+                        <button class="btn" style="background: #475569; margin-left: 5px;" onclick="imprimirDiv('eng-dados-obra', 'Dados da Obra')"><i class="fas fa-print"></i> Imprimir</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="eng-observacao" class="section">
+                <h2>Observação - Obra ou Serviço</h2>
+                <div class="card">
+                    <div class="form-grid">
+                        <div class="form-group full-width">
+                            <label>Observações Gerais</label>
+                            <textarea id="obra-observacao-texto" rows="12" placeholder="Descreva aqui as observações pertinentes..."></textarea>
+                            <p style="font-size: 0.8rem; color: var(--danger); margin-top: 5px; font-weight: 600;">Preencher de acordo com Resolução 1024/09.</p>
+                        </div>
+                        <div class="form-group full-width"><label>LOCAL E DATA</label><input type="text" id="obs-local-data" placeholder="Cidade, Data"></div>
+                        <div class="form-group full-width"><label>RESPONSÁVEL TÉCNICO</label><input type="text" id="obs-resp-tecnico" placeholder="Nome do Responsável"></div>
+                        <div class="form-group full-width"><label>ASSINATURA (ASS.)</label><canvas id="signature-pad-obs" class="signature-pad"></canvas><button type="button" class="btn" onclick="limparAssinatura('signature-pad-obs')">Limpar</button></div>
+                    </div>
+                    <div style="margin-top:20px; display:flex; gap:10px;">
+                        <button class="btn btn-success" onclick="salvarObservacao()"><i class="fas fa-save"></i> Salvar Observação</button>
+                        <button class="btn" style="background: #475569;" onclick="imprimirDiv('eng-observacao', 'Observações Técnicas')"><i class="fas fa-print"></i> Imprimir</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="eng-materiais" class="section">
+                <h2>Controle de Materiais</h2>
+                <div class="card">
+                    <div class="form-grid">
+                        <div class="form-group"><label>Material / Insumo</label><input type="text" placeholder="Ex: Cimento CP-II"></div>
+                        <div class="form-group"><label>Tipo de Movimento</label><select><option>Entrada</option><option>Saída / Consumo</option></select></div>
+                        <div class="form-group"><label>Quantidade</label><input type="number"></div>
+                        <div class="form-group"><label>Alerta de Estoque Mínimo</label><input type="number" value="10"></div>
+                    </div>
+                    <div style="margin-top:15px; display:flex; gap:10px;">
+                        <button class="btn btn-success" onclick="registrarMovimentoMaterial()">Registrar Movimento</button>
+                        <button class="btn" style="background: #475569;" onclick="imprimirDiv('eng-materiais', 'Controle de Materiais')"><i class="fas fa-print"></i> Imprimir</button>
+                    </div>
+                    <h4 style="margin-top:20px;">Estoque Atual</h4>
+                    <table><thead><tr><th>Material</th><th>Estoque</th><th>Status</th></tr></thead><tbody id="lista-materiais"></tbody></table>
+                </div>
+            </div>
+
+            <div id="eng-execucao" class="section">
+                <h2>Execução Técnica</h2>
+                <div class="card">
+                    <h4>Upload de Projetos</h4>
+                    <div class="form-group full-width" style="margin-top:15px;"><input type="file" multiple></div>
+                    <div style="margin-top:15px;">
+                        <p style="font-size:0.9rem;"><i class="fas fa-file-pdf"></i> Projeto_Estrutural.pdf</p>
+                    </div>
+                </div>
+                <div class="card">
+                    <h4>Checklist de Execução</h4>
+                    <div class="equip-container">
+                        <label class="equip-item"><input type="checkbox"> Verificação de eixos e gabarito</label>
+                        <label class="equip-item"><input type="checkbox"> Conferência de armadura positiva</label>
+                        <label class="equip-item"><input type="checkbox"> Espaçadores instalados</label>
+                    </div>
+                    <button class="btn" style="background: #475569; margin-top: 15px;" onclick="imprimirDiv('eng-execucao', 'Execução Técnica')"><i class="fas fa-print"></i> Imprimir</button>
+                </div>
+            </div>
+
+            <div id="eng-qualidade" class="section">
+                <h2>Controle de Qualidade</h2>
+                <div class="card">
+                    <h4>Registro de Não Conformidade (RNC)</h4>
+                    <div class="form-grid">
+                        <div class="form-group full-width"><label>Descrição da Ocorrência</label><textarea rows="3"></textarea></div>
+                        <div class="form-group"><label>Gravidade</label><select><option>Baixa</option><option>Média</option><option>Alta</option></select></div>
+                        <div class="form-group"><label>Ação Corretiva</label><input type="text"></div>
+                    </div>
+                    <div style="margin-top:15px; display:flex; gap:10px;">
+                        <button class="btn btn-warning" onclick="alert('RNC Registrada!')">Registrar RNC</button>
+                        <button class="btn" style="background: #475569;" onclick="imprimirDiv('eng-qualidade', 'Controle de Qualidade')"><i class="fas fa-print"></i> Imprimir</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="eng-custos" class="section">
+                <h2>Gestão de Custos</h2>
+                <div class="card">
+                    <div class="form-grid"><div class="form-group"><label>Importar Orçamento (.csv)</label><input type="file"></div></div>
+                    <table style="margin-top:15px;">
+                        <thead><tr><th>Item</th><th>Orçado</th><th>Executado</th><th>Desvio</th></tr></thead>
+                        <tbody>
+                            <tr><td>Mão de Obra</td><td>R$ 50.000</td><td>R$ 52.000</td><td style="color:var(--danger)">+4%</td></tr>
+                        </tbody>
+                    </table>
+                    <button class="btn" style="background: #475569; margin-top: 15px;" onclick="imprimirDiv('eng-custos', 'Gestão de Custos')"><i class="fas fa-print"></i> Imprimir</button>
+                </div>
+            </div>
+
+            <div id="eng-relatorios" class="section">
+                <h2>Relatórios Automáticos</h2>
+                <div class="card">
+                    <div class="form-grid">
+                        <div class="form-group"><label>Período Inicial</label><input type="date"></div>
+                        <div class="form-group"><label>Período Final</label><input type="date"></div>
+                        <div class="form-group full-width"><label>Tipo</label><select><option>Diário</option><option>Semanal</option><option>Mensal</option></select></div>
+                    </div>
+                    <div style="margin-top:15px; display:flex; gap:10px;">
+                         <button class="btn"><i class="fas fa-file-pdf"></i> Gerar PDF</button>
+                         <button class="btn" style="background: #475569;" onclick="imprimirDiv('eng-relatorios', 'Relatórios Automáticos')"><i class="fas fa-print"></i> Imprimir</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="eng-comunicacao" class="section">
+                <h2>Comunicação Integrada</h2>
+                <div class="form-group" style="margin-bottom: 10px; padding: 0 5px;">
+                    <label style="color: var(--primary);">Canal de Comunicação (Obra):</label>
+                    <select id="chat-obra-select" onchange="renderChat()" style="background: white;"></select>
+                </div>
+                <div class="card" style="display:flex; flex-direction:column; height: 400px;">
+                    <div id="chat-container" style="flex:1; background:#f1f5f9; border:1px solid var(--border); border-radius:8px; padding:15px; overflow-y:auto; margin-bottom:15px;"></div>
+                    <div style="display:flex; gap:10px;"><input type="text" id="chat-input" placeholder="Digite sua mensagem..." style="flex:1;"><button class="btn" onclick="enviarMensagem()"><i class="fas fa-paper-plane"></i></button></div>
+                </div>
+            </div>
+
+            <div id="eng-seguranca" class="section">
+                <h2>Segurança (SMS)</h2>
+                <div class="card">
+                    <h4>Registro de Treinamento / DDS</h4>
+                    <div class="form-grid">
+                        <div class="form-group"><label>Tema</label><input type="text" id="sms-tema"></div>
+                        <div class="form-group"><label>Instrutor</label><input type="text" id="sms-instrutor"></div>
+                        <div class="form-group full-width"><label>Funcionários</label><textarea rows="2" id="sms-funcionarios"></textarea></div>
+                    </div>
+                    <div style="margin-top:15px; display:flex; gap:10px;">
+                        <button class="btn btn-success" onclick="salvarSMS()">Registrar</button>
+                        <button class="btn" style="background: #475569;" onclick="imprimirDiv('eng-seguranca', 'Segurança SMS')"><i class="fas fa-print"></i> Imprimir</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="eng-dashboard" class="section">
+                <h2>Dashboard de Desempenho</h2>
+                <div class="card">
+                    <h4>Indicadores de Performance (KPIs)</h4>
+                    <canvas id="chartPerformance" style="max-height: 300px; width: 100%;"></canvas>
+                </div>
+            </div>
+            
+            <div id="checklists" class="section">
+                <h2>Checklists Digitais</h2>
+                <div class="card">
+                    <input type="hidden" id="checklist-edit-index" value="-1">
+                    
+                    <div class="form-group full-width"><label>Obra Vinculada</label><select id="checklist-obra"></select></div>
+                    
+                    <div class="form-group full-width">
+                        <label>Fiscalização Técnica (Referência)</label>
+                        <select id="checklist-ref-tecnica">
+                            <option value="">Selecione a referência...</option>
+                            <option>Projeto executivo</option>
+                            <option>Memorial descritivo</option>
+                            <option>Normas técnicas (ABNT, DNIT, etc.)</option>
+                            <option>Boas práticas de engenharia</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label>Aditivos e Alterações (Parecer Técnico)</label>
+                        <select id="checklist-parecer">
+                            <option value="">Selecione o tipo de parecer...</option>
+                            <option>Aditivo de prazo</option>
+                            <option>Aditivo de valor</option>
+                            <option>Alteração de solução técnica</option>
+                            <option>N/A (Não se aplica)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label>Justificativas</label>
+                        <select id="checklist-justificativa">
+                            <option value="">Selecione a justificativa...</option>
+                            <option>❌ erro da empresa</option>
+                            <option>❌ falha de projeto</option>
+                            <option>❌ situação imprevisível</option>
+                            <option>❌ Outros</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label>Observação (Detalhes)</label>
+                        <textarea id="checklist-obs-parecer" rows="3" placeholder="Insira detalhes adicionais aqui..."></textarea>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label>Recebimento da Obra</label>
+                        <select id="checklist-recebimento">
+                            <option value="">Selecione a etapa...</option>
+                            <option>• Vistorias finais</option>
+                            <option>• Lista de pendências</option>
+                            <option>• Testes de funcionamento</option>
+                            <option>• Termo de recebimento provisório e definitivo</option>
+                        </select>
+                    </div>
+                    <div class="form-group full-width"><label>Tipo de Inspeção</label><select id="checklist-tipo"><option>Inspeção de Segurança</option><option>Qualidade de Materiais</option><option>Conformidade Técnica</option></select></div>
+                    <div class="equip-container" style="margin-top:15px;">
+                        <label class="equip-item"><input type="checkbox"> Uso de EPI obrigatório</label>
+                        <label class="equip-item"><input type="checkbox"> Sinalização de área ativa</label>
+                        <label class="equip-item"><input type="checkbox"> Armazenamento correto de materiais</label>
+                    </div>
+
+                    <div class="form-group full-width" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
+                        <label><i class="fas fa-camera"></i> Registro Fotográfico (Baixa Qualidade)</label>
+                        <input type="file" id="checklist-fotos" multiple accept="image/*">
+                        <p style="font-size:0.75rem; color:var(--text-muted);">Anexe fotos compactas para evidência.</p>
+                    </div>
+
+                    <div style="display:flex; gap:10px; margin-top:15px; justify-content: flex-end;">
+                        <button class="btn btn-success" id="btn-salvar-checklist" onclick="salvarChecklist()"><i class="fas fa-save"></i> Salvar Nova Inspeção</button>
+                    </div>
+                    
+                    <h4 style="margin-top:20px; border-bottom:1px solid #eee; padding-bottom:5px;">Inspeções Registradas</h4>
+                    
+                    <input type="text" id="search-checklist-obra" placeholder="Pesquisar por Nome da Obra..." onkeyup="filtrarChecklists()" style="width: 100%; margin-bottom: 10px;">
+                    
+                    <table style="width: 100%;">
+                        <thead>
+                            <tr>
+                                <th>Obra</th> 
+                                <th>Tipo</th>
+                                <th>Data</th>
+                                <th style="width: 250px;">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-checklists-fiscal"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="medicoes" class="section">
+                <h2>Medições e Relatórios</h2>
+                <div class="card">
+                    <input type="hidden" id="medicao-edit-index" value="-1">
+                    <div class="form-grid">
+                        
+                        <div class="form-group full-width"><label>Obra Vinculada</label><select id="medicao-obra"></select></div>
+
+                        <div class="form-group"><label>Item de Medição</label><input type="text" id="medicao-item" placeholder="Ex: Escavação"></div>
+                        <div class="form-group"><label>Quantidade Medida</label><input type="number" id="medicao-qtd"></div>
+                        
+                        <div class="full-width" style="border-top: 1px solid #eee; margin-top: 10px; padding-top: 10px;">
+                            <h5 style="margin-bottom: 10px; color: var(--accent);">Observações / Detalhes Técnicos</h5>
+                            <textarea id="medicao-obs" rows="3" style="width: 100%;" placeholder="Insira observações, justificativas ou detalhes da medição aqui..."></textarea>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:10px; margin-top:15px; justify-content: flex-end;">
+                        <button class="btn btn-success" id="btn-salvar-medicao" onclick="salvarMedicao()"><i class="fas fa-save"></i> Salvar Medição</button>
+                    </div>
+                    <table style="margin-top:20px;">
+                        <thead><tr><th>Obra</th><th>Item</th><th>Medido</th><th>Obs</th><th>Data</th><th style="width: 250px;">Ações</th></tr></thead>
+                        <tbody id="lista-medicoes"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="cronograma" class="section">
+                <h2>Controle de Cronograma</h2>
+                <div class="card">
+                    <div style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #eee;">
+                        <label style="font-weight: bold; color: var(--accent); margin-right: 10px;">Visualizar Cronograma da Obra:</label>
+                        <select id="cronograma-obra" onchange="atualizarCronogramaVisual()" style="max-width: 300px; display: inline-block;"></select>
+                    </div>
+                    
+                    <p>Status da Obra: <span id="progresso-status" style="color:var(--success); font-weight:bold;">No Prazo</span></p>
+                    <div style="background:#eee; height:20px; border-radius:10px; margin: 15px 0;">
+                        <div id="progresso-bar-fill" style="background:var(--accent); width:65%; height:100%; border-radius:10px; text-align:center; color:white; font-size:0.7rem; transition: width 0.5s ease;">
+                            <span id="progresso-valor">65% Concluído</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="aprovacao" class="section">
+                <h2>Fluxo de Aprovação</h2>
+                <div class="card">
+                    
+                    <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                        <label style="font-weight: bold; color: var(--primary);">Filtrar por Obra:</label>
+                        <select id="aprovacao-obra-filter" onchange="renderAprovacoes()" style="flex: 1;"></select>
+                    </div>
+
+                    <h4>Pendências de Assinatura</h4>
+                    <table><thead><tr><th>ID</th><th>Obra</th><th>Data</th><th>Tipo</th><th>Ação</th></tr></thead><tbody id="lista-aprovacoes"></tbody></table>
+                </div>
+            </div>
+
+            <div id="alm-estoque" class="section">
+                <h2>Gestão de Estoque (Almoxarifado)</h2>
+                <div class="card">
+                    <h4>Cadastrar Novo Item</h4>
+                    <div class="form-grid">
+                        <div class="form-group full-width"><label>Nome do Item</label><input type="text" id="alm-item-nome"></div>
+                        <div class="form-group"><label>Categoria</label><select id="alm-item-cat"><option>Insumo</option><option>EPI</option><option>Ferramenta</option></select></div>
+                        <div class="form-group"><label>Quantidade Inicial</label><input type="number" id="alm-item-qtd"></div>
+                    </div>
+                    <button class="btn btn-success" style="margin-top:15px;" onclick="adicionarItemEstoque()">Adicionar ao Estoque</button>
+                </div>
+                <div class="card">
+                    <h4>Estoque Geral</h4>
+                    <table style="margin-top:10px;">
+                        <thead><tr><th>Item</th><th>Categoria</th><th>Qtd. Disponível</th></tr></thead>
+                        <tbody id="lista-estoque-alm"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="alm-controle" class="section">
+                <h2>Devoluções e Empréstimos</h2>
+                <div class="card">
+                    <h4>Ferramentas em Uso (Aguardando Devolução)</h4>
+                    <table style="margin-top:10px;">
+                        <thead><tr><th>Ferramenta</th><th>Usuário</th><th>Data Retirada</th><th>Ação</th></tr></thead>
+                        <tbody id="lista-ferramentas-uso"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="ped-solicitacao" class="section">
+                <h2>Solicitar Materiais e EPIs</h2>
+                <div class="card">
+                    <h4>Nova Solicitação</h4>
+                    <div class="form-grid">
+                        <div class="form-group full-width"><label>Selecione o Item</label><select id="ped-item-select"></select></div>
+                        <div class="form-group"><label>Quantidade</label><input type="number" id="ped-item-qtd"></div>
+                        <div class="form-group"><label>Tipo</label><select id="ped-tipo-req"><option>Consumo (Material/EPI)</option><option>Empréstimo (Ferramenta)</option></select></div>
+                    </div>
+                    <button class="btn btn-success" style="margin-top:15px;" onclick="realizarSolicitacao()">Solicitar</button>
+                </div>
+            </div>
+
+            <div id="ped-ferramentas" class="section">
+                <h2>Minhas Ferramentas</h2>
+                <div class="card">
+                    <h4>Ferramentas em minha posse</h4>
+                    <table style="margin-top:10px;">
+                        <thead><tr><th>Ferramenta</th><th>Data Retirada</th><th>Ação</th></tr></thead>
+                        <tbody id="lista-minhas-ferramentas"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="gestao" class="section">
+                <h2>Gestão e Controle de Acessos</h2>
+                <div class="card">
+                    <h4 id="titulo-obra-form"><i class="fas fa-city"></i> Cadastrar Nova Obra</h4>
+                    <form onsubmit="event.preventDefault(); adicionarObra();" class="form-grid" style="margin-top: 15px;" id="form-obra">
+                        <input type="hidden" id="edit-obra-index" value="-1">
+                        
+                        <div class="form-group full-width"><label>Nome da Obra</label><input type="text" id="new-obra-nome" required></div>
+                        
+                        <div class="form-group full-width">
+                            <label>Foto de Destaque</label>
+                            <input type="file" id="new-obra-foto" accept="image/*">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Engenheiro(s) Responsável(eis)</label>
+                            <div class="custom-select-container" id="container-eng">
+                                <div class="select-btn" onclick="toggleDropdown('eng')">
+                                    <span class="btn-text" id="display-eng">Selecione...</span>
+                                    <i class="fas fa-chevron-down"></i>
+                                </div>
+                                <div class="dropdown-content" id="dropdown-eng">
+                                    <input type="text" class="search-box" placeholder="Pesquisar engenheiro..." onkeyup="filterList('eng')">
+                                    <div class="options-list" id="list-eng"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Fiscal(is) Vinculado(s)</label>
+                            <div class="custom-select-container" id="container-fiscal">
+                                <div class="select-btn" onclick="toggleDropdown('fiscal')">
+                                    <span class="btn-text" id="display-fiscal">Selecione...</span>
+                                    <i class="fas fa-chevron-down"></i>
+                                </div>
+                                <div class="dropdown-content" id="dropdown-fiscal">
+                                    <input type="text" class="search-box" placeholder="Pesquisar fiscal..." onkeyup="filterList('fiscal')">
+                                    <div class="options-list" id="list-fiscal"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group"><label>Nº Alvará</label><input type="text" id="new-obra-alvara"></div>
+                        <div class="form-group"><label>Licença Ambiental</label><input type="text" id="new-obra-licenca"></div>
+                        <div class="form-group"><label>Valor Contratado (R$)</label><input type="number" step="0.01" id="new-obra-valor-contrato"></div>
+                        <div class="form-group"><label>Valor Medido (R$)</label><input type="number" step="0.01" id="new-obra-valor-medido"></div>
+                        
+                        <div class="full-width" style="display: flex; gap: 10px; margin-top: 15px;">
+                            <button class="btn" type="submit" id="btn-salvar-obra" style="flex: 1;">Salvar Obra</button>
+                            <button class="btn btn-danger" type="button" onclick="cancelarEdicaoObra()" style="display: none;" id="btn-cancelar-obra">Cancelar</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card">
+                    <h4>Obras Cadastradas</h4>
+                    <table style="margin-top: 10px;">
+                        <thead><tr><th>Obra</th><th>Engenheiros</th><th>Fiscais</th><th>Ações</th></tr></thead>
+                        <tbody id="lista-obras-gestao"></tbody>
+                    </table>
+                </div>
+                
+                <div class="form-grid">
+                    <div class="card">
+                        <h4>Documentos de Engenharia Preenchidos</h4>
+                        <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:10px;">Visualização dos cadastros registrados no Módulo de Engenharia.</p>
+                        
+                        <input type="text" id="search-eng-admin" placeholder="Pesquisar documento..." onkeyup="filtrarTabelaAdmin('search-eng-admin', 'lista-taps-admin')" style="width: 100%; margin-bottom: 10px;">
+                        
+                        <div style="max-height: 300px; overflow-y: auto;">
+                            <table style="width: 100%;">
+                                <thead><tr><th>Documento</th><th>Referência/Nome</th><th>Ações</th></tr></thead>
+                                <tbody id="lista-taps-admin"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h4>Documentos de Segurança (SMS) Preenchidos</h4>
+                        <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:10px;">Registros de Treinamentos e DDS.</p>
+                        
+                        <input type="text" id="search-sms-admin" placeholder="Pesquisar registro..." onkeyup="filtrarTabelaAdmin('search-sms-admin', 'lista-sms-admin')" style="width: 100%; margin-bottom: 10px;">
+                        
+                        <div style="max-height: 300px; overflow-y: auto;">
+                            <table style="width: 100%;">
+                                <thead><tr><th>Tema</th><th>Instrutor</th><th>Ações</th></tr></thead>
+                                <tbody id="lista-sms-admin"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div id="configuracoes" class="section">
+                <h2>Administração do Sistema</h2>
+                <div class="card">
+                    <h4>Backup e Exportação de Dados</h4>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button class="btn" onclick="exportarDados()"><i class="fas fa-file-code"></i> Exportar Backup (JSON)</button>
+                        <button class="btn btn-warning" onclick="importarDados()"><i class="fas fa-upload"></i> Restaurar Backup</button>
+                        
+                        <button class="btn" style="background: #2563eb;" onclick="exportarExcel()"><i class="fas fa-file-excel"></i> Exportar Excel (Estruturado)</button>
+                        <button class="btn" style="background: #dc2626;" onclick="exportarPDFSistema()"><i class="fas fa-file-pdf"></i> Exportar em PDF</button>
+
+                        <button class="btn btn-danger" onclick="limparTudo()"><i class="fas fa-trash-alt"></i> Resetar Sistema</button>
+                    </div>
+                </div>
+                
+                <div id="card-gestao-usuarios" class="card">
+                    <h4><i class="fas fa-users"></i> Gestão de Usuários</h4>
+                    
+                    <div id="user-group-filters" class="user-groups-container">
+                        </div>
+
+                    <form onsubmit="event.preventDefault(); salvarUsuario();" class="form-grid" style="margin-top: 15px;" id="form-usuario">
+                        <div class="form-group"><label>Usuário</label><input type="text" id="new-user-name"></div>
+                        <div class="form-group"><label>Telefone</label><input type="text" id="new-user-phone"></div>
+                        <div class="form-group"><label>Senha</label><input type="password" id="new-user-pass"></div>
+                        <div class="form-group"><label>Nível de Acesso (Papel)</label>
+                            <select id="new-user-level">
+                                <option value="5">Administrador (Total)</option>
+                                <option value="8">Administrador (Sem Gestão Usuários)</option>
+                                <option value="4">Empreiteiro (Gestor de Obra)</option>
+                                <option value="3">Engenheiro (Operador)</option>
+                                <option value="2">Gestão Fiscal</option>
+                                <option value="6">Almoxarifado (Estoque)</option>
+                                <option value="7">Pedreiro (Operacional)</option>
+                                <option value="1">Visitante (Apenas Leitura)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group full-width">
+                            <label>Permissões de Visualização</label>
+                            <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 5px;">
+                                <label><input type="checkbox" id="perm-fiscal"> Módulo Fiscal</label>
+                                <label><input type="checkbox" id="perm-eng"> Módulo Engenharia</label>
+                                <label><input type="checkbox" id="perm-admin"> Administração</label>
+                                <label><input type="checkbox" id="perm-emp"> Módulo Empreiteiro</label>
+                                <label><input type="checkbox" id="perm-alm"> Almoxarifado</label>
+                                <label><input type="checkbox" id="perm-ped"> Pedreiro</label>
+                            </div>
+                        </div>
+
+                        <button class="btn full-width" type="submit" id="btn-salvar-user">Salvar Usuário</button>
+                        <button class="btn btn-danger full-width" type="button" onclick="cancelarEdicaoUsuario()" style="margin-top: 10px; display: none;" id="btn-cancelar-user">Cancelar</button>
+                    </form>
+                    <table style="margin-top: 20px;"><thead><tr><th>Usuário</th><th>Telefone</th><th>Perfil</th><th>Ações</th></tr></thead><tbody id="lista-usuarios"></tbody></table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="print-modal"><div class="modal-content"><div id="print-content"></div><hr style="margin: 20px 0;"><button class="btn" onclick="window.print()">Imprimir</button><button class="btn btn-danger" onclick="document.getElementById('print-modal').style.display='none'">Fechar</button></div></div>
+
+    <script>
+        let currentUser = null;
+        let justificationCallback = null;
+        let pendingActionName = "";
+
+        // --- FUNÇÕES DE JUSTIFICATIVA E AUDITORIA (LOGS) ---
+        function requestJustification(actionTitle, callback) {
+            pendingActionName = actionTitle;
+            document.getElementById('justification-title').innerHTML = '<i class="fas fa-exclamation-triangle"></i> ' + actionTitle;
+            document.getElementById('justification-text').value = "";
+            document.getElementById('justification-modal').style.display = 'flex';
+            justificationCallback = callback;
+        }
+
+        function cancelJustification() {
+            document.getElementById('justification-modal').style.display = 'none';
+            justificationCallback = null;
+            pendingActionName = "";
+        }
+
+        function confirmJustification() {
+            const reason = document.getElementById('justification-text').value.trim();
+            if(!reason) { alert("A justificativa é obrigatória para realizar esta ação!"); return; }
+            
+            const logs = JSON.parse(localStorage.getItem('auditoria')) || [];
+            logs.unshift({ 
+                user: currentUser ? currentUser.name : 'Desconhecido', 
+                action: pendingActionName, 
+                reason: reason, 
+                timestamp: new Date().toLocaleString() 
+            });
+            localStorage.setItem('auditoria', JSON.stringify(logs));
+            
+            document.getElementById('justification-modal').style.display = 'none';
+            if(justificationCallback) { 
+                justificationCallback(); 
+                justificationCallback = null; 
+            }
+            if(document.getElementById('admin-logs').classList.contains('active')) renderLogs();
+        }
+        
+        function renderLogs() {
+            const logs = JSON.parse(localStorage.getItem('auditoria')) || [];
+            const tbody = document.getElementById('tabela-logs');
+            if(!tbody) return;
+            if(logs.length === 0) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 20px;">Nenhum registro de auditoria encontrado.</td></tr>'; return; }
+            tbody.innerHTML = logs.map(log => `<tr><td>${log.timestamp}</td><td><strong>${log.user}</strong></td><td>${log.action}</td><td>${log.reason}</td></tr>`).join('');
+        }
+
+        // --- DADOS INICIAIS ---
+        const backupData = {
+            "usuarios": {
+                "admin": {"pass": "123", "level": 5, "permissions": ["admin", "engenharia", "fiscal", "empreiteiro", "almoxarifado", "pedreiro"], "phone": "21 99999-9999", "email": "admin@diariopro.com"}, 
+                "engenheiro": {"pass": "123", "level": 3, "permissions": ["engenharia"], "phone": "21 98888-8888", "email": "eng@obra.com"},
+                "empreiteiro": {"pass": "123", "level": 4, "permissions": ["empreiteiro"], "phone": "", "email": "empreiteiro@obra.com"},
+                "fiscal": {"pass": "123", "level": 2, "permissions": ["fiscal"], "phone": "21 97777-7777", "email": "fiscal@gov.br"},
+                "hernande": {"pass": "123", "level": 3, "permissions": ["engenharia"], "phone": "21 98888-8888", "email": "hernande@eng.com"},
+                "thiago": {"pass": "123", "level": 2, "permissions": ["fiscal"], "phone": "21 97777-7777", "email": "thiago@fiscal.com"},
+                "almoxarife": {"pass": "123", "level": 6, "permissions": ["almoxarifado"], "phone": ""},
+                "joao": {"pass": "123", "level": 7, "permissions": ["pedreiro"], "phone": ""}
+            },
+            "obras": [{ "nome": "Moles de Itaipú", "engenheiro": ["hernande"], "fiscal": ["thiago"], "alvara": "123/2026", "licenca": "456/2026", "valorContrato": "1200000", "valorMedido": "111000", "prazo": "2027-06-26", "climaManha": "Nublado", "climaTarde": "Nublado", "climaNoite": "Nublado", "turno": "Três Turnos (24 horas)" }],
+            "relatorios": [{ "obra": "Moles de Itaipú", "data": "2026-01-26", "qtd": "120", "equipamentos": ["Escavadeira hidráulica"], "clima": {"manha": "Nublado", "tarde": "Chuva", "noite": "Sol"}, "terceirizada": {"nome": "SH Reformas", "qtd": "85", "servico": "Civil"}, "detalhes": "Início das atividades.", "responsavel": "hernande", "assinatura": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAAXNSR0IArs4c6QAAAAtJREFUGFdjYAACAAAFAAGq1cRzAAAAAElFTkSuQmCC", "timestamp": 1706295000000, "status": "Pendente", "gps": "-22.909938, -43.102376" }],
+            "checklists": []
+        };
+
+        function init() {
+            if (!localStorage.getItem('obras')) localStorage.setItem('obras', JSON.stringify(backupData.obras));
+            if (!localStorage.getItem('relatorios')) localStorage.setItem('relatorios', JSON.stringify(backupData.relatorios));
+            if (!localStorage.getItem('usuarios')) localStorage.setItem('usuarios', JSON.stringify(backupData.usuarios));
+            if (!localStorage.getItem('checklists')) localStorage.setItem('checklists', JSON.stringify(backupData.checklists));
+            if (!localStorage.getItem('materiais')) localStorage.setItem('materiais', JSON.stringify([{nome: "Cimento CP-II", qtd: 45}]));
+            if (!localStorage.getItem('medicoes')) localStorage.setItem('medicoes', JSON.stringify([]));
+            if (!localStorage.getItem('auditoria')) localStorage.setItem('auditoria', JSON.stringify([])); 
+            
+            if (!localStorage.getItem('estoque_geral')) localStorage.setItem('estoque_geral', JSON.stringify([]));
+            if (!localStorage.getItem('solicitacoes_ferramentas')) localStorage.setItem('solicitacoes_ferramentas', JSON.stringify([]));
+
+            if (!localStorage.getItem('db_taps')) localStorage.setItem('db_taps', JSON.stringify([]));
+            if (!localStorage.getItem('db_contratos')) localStorage.setItem('db_contratos', JSON.stringify([]));
+            if (!localStorage.getItem('db_contratantes')) localStorage.setItem('db_contratantes', JSON.stringify([]));
+            if (!localStorage.getItem('db_dados_obra')) localStorage.setItem('db_dados_obra', JSON.stringify([]));
+            if (!localStorage.getItem('db_observacoes')) localStorage.setItem('db_observacoes', JSON.stringify([]));
+            if (!localStorage.getItem('db_seguranca')) localStorage.setItem('db_seguranca', JSON.stringify([])); 
+            
+            if (!localStorage.getItem('db_fotos_gps')) localStorage.setItem('db_fotos_gps', JSON.stringify([]));
+            if (!localStorage.getItem('db_ocorrencias_fiscal')) localStorage.setItem('db_ocorrencias_fiscal', JSON.stringify([]));
+
+            if (!localStorage.getItem('db_chat_messages')) localStorage.setItem('db_chat_messages', JSON.stringify([]));
+
+            const users = JSON.parse(localStorage.getItem('usuarios'));
+            let updated = false;
+            for(let u in users) {
+                if(!users[u].permissions) {
+                    updated = true;
+                    if(users[u].level === 5 || users[u].level === 8) users[u].permissions = ["admin", "engenharia", "fiscal", "empreiteiro", "almoxarifado", "pedreiro"];
+                    else if(users[u].level === 4) users[u].permissions = ["empreiteiro"];
+                    else if(users[u].level === 3) users[u].permissions = ["engenharia"];
+                    else if(users[u].level === 2) users[u].permissions = ["fiscal"];
+                    else if(users[u].level === 6) users[u].permissions = ["almoxarifado"];
+                    else if(users[u].level === 7) users[u].permissions = ["pedreiro"];
+                    else users[u].permissions = [];
+                }
+                if(users[u].level === 5 || users[u].level === 8) {
+                    if(!users[u].permissions.includes('almoxarifado')) { users[u].permissions.push('almoxarifado'); updated = true; }
+                    if(!users[u].permissions.includes('pedreiro')) { users[u].permissions.push('pedreiro'); updated = true; }
+                }
+            }
+            if(updated) localStorage.setItem('usuarios', JSON.stringify(users));
+
+            const obras = JSON.parse(localStorage.getItem('obras'));
+            let obrasUpdated = false;
+            obras.forEach(o => {
+                if(typeof o.engenheiro === 'string') { o.engenheiro = [o.engenheiro]; obrasUpdated = true; }
+                if(typeof o.fiscal === 'string') { o.fiscal = [o.fiscal]; obrasUpdated = true; }
+            });
+            if(obrasUpdated) localStorage.setItem('obras', JSON.stringify(obras));
+            
+            renderCustomSelects();
+            setupAllSignatures();
+            renderUsuarios(); 
+            renderObrasGestao();
+            
+            window.onclick = function(event) {
+                if (!event.target.closest('.custom-select-container')) {
+                    document.querySelectorAll('.dropdown-content').forEach(d => d.classList.remove('show'));
+                }
+            }
+        }
+
+        function checkNewMessages(userObj) {
+            const allMessages = JSON.parse(localStorage.getItem('db_chat_messages') || '[]');
+            const obras = JSON.parse(localStorage.getItem('obras') || '[]');
+            const user = userObj.name;
+            const level = userObj.level;
+
+            const userWorks = obras.filter(o => {
+                if (level === 5 || level === 8) return true; 
+                const engs = Array.isArray(o.engenheiro) ? o.engenheiro : [o.engenheiro];
+                const fiscs = Array.isArray(o.fiscal) ? o.fiscal : [o.fiscal];
+                return engs.includes(user) || fiscs.includes(user);
+            }).map(o => o.nome);
+
+            if (userWorks.length === 0) return;
+            const newMsgs = allMessages.filter(m => userWorks.includes(m.obra) && m.user !== user);
+
+            if (newMsgs.length > 0) {
+                setTimeout(() => {
+                    const obrasComMsg = [...new Set(newMsgs.map(m=>m.obra))].join(', ');
+                    alert(`🔔 NOVA MENSAGEM NO CHAT!\n\nVocê possui mensagens não lidas nas seguintes obras:\n${obrasComMsg}\n\nAcesse o menu "Comunicação" para responder.`);
+                }, 800);
+            }
+        }
+
+        function attemptLogin() {
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            const users = JSON.parse(localStorage.getItem('usuarios'));
+            
+            if(users[u] && users[u].pass === p) {
+                currentUser = users[u];
+                currentUser.name = u;
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('app-container').style.display = 'flex';
+                
+                document.getElementById('tab-admin').style.display = 'none';
+                document.getElementById('tab-engenharia').style.display = 'none';
+                document.getElementById('tab-fiscal').style.display = 'none';
+                document.getElementById('tab-empreiteiro').style.display = 'none';
+                document.getElementById('tab-almoxarifado').style.display = 'none';
+                document.getElementById('tab-pedreiro').style.display = 'none';
+                
+                document.getElementById('dash-fiscal-indicadores').style.display = 'none';
+                document.getElementById('menu-item-novo-rdo').style.display = 'flex';
+                document.getElementById('menu-item-historico').style.display = 'flex';
+                document.getElementById('menu-item-logs').style.display = 'none';
+
+                const perms = currentUser.permissions || [];
+                
+                if(perms.includes('admin')) document.getElementById('tab-admin').style.display = 'block';
+                if(perms.includes('engenharia')) {
+                    document.getElementById('tab-engenharia').style.display = 'block';
+                    if(currentUser.level === 3 || currentUser.level === 5 || currentUser.level === 8) {
+                         ['menu-eng-materiais', 'menu-eng-execucao', 'menu-eng-qualidade', 'menu-eng-custos', 'menu-eng-relatorios'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).style.display = 'none'; });
+                         if(currentUser.level === 3) document.getElementById('menu-item-novo-rdo').style.display = 'none';
+                         if(currentUser.level === 5 || currentUser.level === 8) {
+                             document.getElementById('menu-item-novo-rdo').style.display = 'none';
+                             document.getElementById('menu-item-viz-rdo').style.display = 'flex';
+                             document.getElementById('menu-item-logs').style.display = 'flex';
+                             document.getElementById('btns-tap').style.display = 'flex';
+                             document.getElementById('btns-contrato').style.display = 'flex';
+                             document.getElementById('btns-contratante').style.display = 'flex';
+                             document.getElementById('btns-obra').style.display = 'flex';
+                         } else {
+                             if(document.getElementById('menu-item-viz-rdo')) document.getElementById('menu-item-viz-rdo').style.display = 'none';
+                         }
+                    } 
+                    if(currentUser.level === 3) {
+                         document.getElementById('btns-tap').style.display = 'flex';
+                         document.getElementById('btns-contrato').style.display = 'flex';
+                         document.getElementById('btns-contratante').style.display = 'flex';
+                         document.getElementById('btns-obra').style.display = 'flex';
+                    }
+                } else { if(document.getElementById('menu-item-viz-rdo')) document.getElementById('menu-item-viz-rdo').style.display = 'none'; }
+                
+                if(perms.includes('fiscal')) { document.getElementById('tab-fiscal').style.display = 'block'; document.getElementById('dash-fiscal-indicadores').style.display = 'block'; }
+                if(perms.includes('empreiteiro')) document.getElementById('tab-empreiteiro').style.display = 'block';
+                
+                if(perms.includes('almoxarifado')) {
+                     document.getElementById('tab-almoxarifado').style.display = 'block';
+                     if(currentUser.level === 6) document.getElementById('menu-item-novo-rdo').style.display = 'none';
+                }
+                
+                if(perms.includes('pedreiro')) {
+                     document.getElementById('tab-pedreiro').style.display = 'block';
+                     if(currentUser.level === 7) {
+                         document.getElementById('menu-item-novo-rdo').style.display = 'none';
+                         document.getElementById('menu-item-historico').style.display = 'none';
+                     }
+                }
+
+                if(currentUser.level == 1) { document.getElementById('menu-item-novo-rdo').style.display = 'none'; document.getElementById('menu-item-historico').style.display = 'none'; }
+                if(currentUser.level == 2) document.getElementById('menu-item-novo-rdo').style.display = 'none';
+                if(currentUser.level == 4) document.getElementById('menu-item-historico').style.display = 'none';
+                
+                if(currentUser.level === 8) {
+                    if(document.getElementById('card-gestao-usuarios')) document.getElementById('card-gestao-usuarios').style.display = 'none';
+                } else {
+                    if(document.getElementById('card-gestao-usuarios')) document.getElementById('card-gestao-usuarios').style.display = 'block';
+                }
+
+                const tabsContainer = document.querySelector('.sidebar-tabs');
+                const tabGeral = document.getElementById('tab-geral');
+                tabsContainer.style.flexDirection = 'row'; tabGeral.style.flex = '1'; tabGeral.style.marginBottom = '0';
+                if(currentUser.level === 5 || currentUser.level === 8) { tabGeral.style.flex = '0 0 100%'; tabGeral.style.marginBottom = '8px'; }
+                
+                if(perms.length === 1 && perms.includes('empreiteiro')) switchMenu('empreiteiro'); 
+                else if(perms.length === 1 && perms.includes('almoxarifado')) switchMenu('almoxarifado');
+                else if(perms.length === 1 && perms.includes('pedreiro')) switchMenu('pedreiro');
+                else switchMenu('geral');
+
+                carregarObras();
+                carregarChatObras(); 
+                renderHistorico();
+                atualizarDashboard();
+                renderObrasHome();
+                if(document.getElementById('dash-fiscal-indicadores').style.display === 'block') renderChartFiscal();
+                if(currentUser.level === 5 || currentUser.level === 8) {
+                    renderTAPsAdmin();
+                    renderSMSAdmin(); 
+                }
+                if(perms.includes('pedreiro')) preencherSelectItensPedreiro();
+                
+                if(currentUser.level === 2 || currentUser.level === 3 || currentUser.level === 5 || currentUser.level === 8) {
+                    checkNewMessages(currentUser);
+                }
+
+            } else { document.getElementById('login-error').style.display = 'block'; }
+        }
+
+        function toggleSidebar() { document.body.classList.toggle('sidebar-closed'); }
+
+        function switchMenu(menuName) {
+            document.querySelectorAll('.menu-group').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.sidebar-tab-btn').forEach(el => el.classList.remove('active'));
+            const targetMenu = document.getElementById('menu-' + menuName);
+            const targetTab = document.getElementById('tab-' + menuName);
+            if(targetMenu) targetMenu.classList.add('active');
+            if(targetTab) targetTab.classList.add('active');
+        }
+
+        function toggleSubmenu(submenuId, parentSectionId) {
+            showSection(parentSectionId, false); 
+            const sub = document.getElementById(submenuId);
+            const display = sub.style.display === 'block' ? 'none' : 'block';
+            sub.style.display = display;
+        }
+
+        function showSection(id, closeSidebar = true) { 
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active')); 
+            const target = document.getElementById(id); 
+            if(target) { 
+                target.classList.add('active'); 
+                if(closeSidebar && !document.body.classList.contains('sidebar-closed')) document.body.classList.add('sidebar-closed'); 
+                setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100); 
+            }
+            
+            setTimeout(setupAllSignatures, 300); 
+            if(id === 'eng-dashboard') setTimeout(renderChartPerformance, 300); 
+            if(id === 'eng-materiais') renderEstoque(); 
+            if(id === 'eng-comunicacao') carregarChatObras(); 
+            if(id === 'admin-logs') renderLogs(); 
+            if(id === 'medicoes') renderMedicoes(); 
+            if(id === 'aprovacao') {
+                carregarObrasSelects(); // Carrega o select para o engenheiro também
+                renderAprovacoes();
+            }
+            if(id === 'cronograma') {
+                carregarObrasSelects(); // Carrega o select para o fiscal
+            }
+            if(id === 'checklists') {
+                carregarObrasSelects(); // Atualizar lista de obras ao abrir checklists
+                renderChecklistFiscal();
+            }
+            if(id === 'alm-estoque') renderEstoqueAlmoxarifado();
+            if(id === 'alm-controle') renderFerramentasUso();
+            if(id === 'ped-ferramentas') renderMinhasFerramentas();
+            if(id === 'ped-solicitacao') preencherSelectItensPedreiro();
+            if(id === 'sec-relatorios-fiscal') { 
+                carregarObrasSelects(); 
+                renderFotoGPS(); 
+                renderOcorrencia(); 
+            }
+            
+            if(id === 'gestao' && (currentUser.level === 5 || currentUser.level === 8)) {
+                renderTAPsAdmin();
+                renderSMSAdmin();
+            }
+        }
+        
+        function carregarChatObras() {
+            const select = document.getElementById('chat-obra-select');
+            if(!select) return;
+            select.innerHTML = "";
+            const obras = JSON.parse(localStorage.getItem('obras') || '[]');
+            const user = currentUser.name;
+            const level = currentUser.level;
+            
+            const allowed = obras.filter(o => {
+                if (level === 5 || level === 8) return true; 
+                const engs = Array.isArray(o.engenheiro) ? o.engenheiro : [o.engenheiro];
+                const fiscs = Array.isArray(o.fiscal) ? o.fiscal : [o.fiscal];
+                return engs.includes(user) || fiscs.includes(user);
+            });
+            
+            if(allowed.length === 0) {
+                 select.innerHTML = "<option value=''>Sem obras vinculadas</option>";
+                 document.getElementById('chat-container').innerHTML = "<p style='text-align:center; margin-top:20px; color:#aaa;'>Nenhuma obra vinculada para chat.</p>";
+            } else {
+                 select.innerHTML = allowed.map(o => `<option value="${o.nome}">${o.nome}</option>`).join('');
+                 renderChat();
+            }
+        }
+
+        function renderChat() {
+            const obraName = document.getElementById('chat-obra-select').value;
+            const container = document.getElementById('chat-container');
+            
+            if(!obraName) {
+                container.innerHTML = "<p style='text-align:center; margin-top:20px; color:#aaa;'>Selecione uma obra.</p>";
+                return;
+            }
+
+            const allMessages = JSON.parse(localStorage.getItem('db_chat_messages') || '[]');
+            const chatMsgs = allMessages.filter(m => m.obra === obraName);
+            
+            if(chatMsgs.length === 0) {
+                container.innerHTML = `<p style='text-align:center; margin-top:20px; color:#aaa;'>Nenhuma mensagem para ${obraName}.</p>`;
+            } else {
+                container.innerHTML = chatMsgs.map(m => `
+                    <div style="margin-bottom: 10px; padding: 8px; background: white; border-radius: 6px; border: 1px solid #e2e8f0;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                            <strong style="color:var(--accent); font-size:0.9rem;">${m.user}</strong>
+                            <small style="color:#aaa; font-size:0.75rem;">${m.time}</small>
+                        </div>
+                        <p style="font-size:0.9rem; margin:0;">${m.text}</p>
+                    </div>
+                `).join('');
+            }
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        function enviarMensagem() { 
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            const obraName = document.getElementById('chat-obra-select').value;
+            
+            if(!text || !obraName) return;
+
+            const newMsg = {
+                obra: obraName,
+                user: currentUser.name,
+                text: text,
+                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            };
+
+            const allMessages = JSON.parse(localStorage.getItem('db_chat_messages') || '[]');
+            allMessages.push(newMsg);
+            localStorage.setItem('db_chat_messages', JSON.stringify(allMessages));
+            
+            const obras = JSON.parse(localStorage.getItem('obras') || '[]');
+            const users = JSON.parse(localStorage.getItem('usuarios') || '{}');
+            const currentObra = obras.find(o => o.nome === obraName);
+            
+            if (currentObra) {
+                let recipients = [];
+                const engs = Array.isArray(currentObra.engenheiro) ? currentObra.engenheiro : [currentObra.engenheiro];
+                const fiscs = Array.isArray(currentObra.fiscal) ? currentObra.fiscal : [currentObra.fiscal];
+                
+                [...engs, ...fiscs].forEach(u => {
+                    if (u !== currentUser.name && users[u]) {
+                        recipients.push(users[u]);
+                    }
+                });
+
+                if (recipients.length > 0) {
+                    let log = "Simulação de envio externo:\n";
+                    recipients.forEach(dest => {
+                        const email = dest.email || "email@exemplo.com";
+                        const phone = dest.phone || "Sem telefone";
+                        log += `- E-mail para: ${email}\n- WhatsApp para: ${phone}\n`;
+                    });
+                    alert(`Mensagem enviada no chat!\n\n${log}\nNotificações externas despachadas com sucesso.`);
+                }
+            }
+            
+            input.value = "";
+            renderChat();
+        }
+
+        function getFields(tipo) {
+            if(tipo === 'contrato') return ['contrato-nome', 'contrato-titulo', 'contrato-crea', 'contrato-rg', 'contrato-cpf', 'contrato-endereco', 'contrato-bairro', 'contrato-cidade', 'contrato-uf', 'contrato-cep', 'contrato-fone', 'contrato-celular', 'contrato-email'];
+            if(tipo === 'contratante') return ['contratante-nome', 'contratante-rg-ie', 'contratante-cpf-cnpj', 'contratante-endereco', 'contratante-bairro', 'contratante-cidade', 'contratante-uf', 'contratante-cep', 'contratante-fone', 'contratante-celular', 'contratante-email'];
+            if(tipo === 'obra') return ['obra-bairro', 'obra-cidade', 'obra-uf', 'obra-cep', 'obra-natureza', 'obra-quantificacao', 'obra-unidade', 'obra-descricao', 'obra-data-contrato', 'obra-data-inicio', 'obra-data-fim', 'obra-local-data'];
+            return [];
+        }
+
+        // --- FUNÇÕES REVISADAS COM LOG DE AUDITORIA ---
+        function salvarFormularioEspecifico(tipo) {
+            const fields = getFields(tipo);
+            let dbKey = '';
+            if(tipo === 'contrato') dbKey = 'db_contratos';
+            else if(tipo === 'contratante') dbKey = 'db_contratantes';
+            else if(tipo === 'obra') dbKey = 'db_dados_obra';
+            
+            const list = JSON.parse(localStorage.getItem(dbKey) || '[]');
+            
+            // Lógica de salvamento padrão
+            const executeSave = () => {
+                const data = {};
+                fields.forEach(id => { const el = document.getElementById(id); if(el) data[id] = el.value; });
+                
+                if(tipo === 'obra') { 
+                    data['sign-resp'] = document.getElementById('signature-pad-resp').toDataURL(); 
+                    data['sign-contratante'] = document.getElementById('signature-pad-contratante').toDataURL(); 
+                }
+                
+                data.id = Date.now();
+                data.savedAt = new Date().toLocaleString();
+
+                list.push(data); 
+                localStorage.setItem(dbKey, JSON.stringify(list));
+                alert('Cadastro salvo com sucesso!');
+            };
+
+            executeSave();
+        }
+
+        function carregarFormularioEspecifico(tipo, isEditTrigger) {
+            const logic = () => {
+                let dbKey = '';
+                if(tipo === 'contrato') dbKey = 'db_contratos';
+                else if(tipo === 'contratante') dbKey = 'db_contratantes';
+                else if(tipo === 'obra') dbKey = 'db_dados_obra';
+                
+                const list = JSON.parse(localStorage.getItem(dbKey) || '[]');
+                if(list.length > 0) { 
+                    const data = list[list.length - 1]; 
+                    getFields(tipo).forEach(id => { const el = document.getElementById(id); if(el && data[id]) el.value = data[id]; }); 
+                } else {
+                    alert('Nenhum registro encontrado neste banco de dados.');
+                }
+            };
+            
+            if(isEditTrigger) {
+                // Ao clicar no botão EDITAR (amarelo), solicita justificativa
+                requestJustification("Edição de " + tipo, () => {
+                   logic();
+                   alert('Último registro carregado para edição.'); 
+                });
+            } else {
+                logic();
+            }
+        }
+        
+        function excluirFormularioEspecifico(tipo) {
+            requestJustification("Exclusão " + tipo, () => {
+                let dbKey = '';
+                if(tipo === 'contrato') dbKey = 'db_contratos';
+                else if(tipo === 'contratante') dbKey = 'db_contratantes';
+                else if(tipo === 'obra') dbKey = 'db_dados_obra';
+
+                const list = JSON.parse(localStorage.getItem(dbKey) || '[]');
+                if(list.length > 0) {
+                    list.pop(); 
+                    localStorage.setItem(dbKey, JSON.stringify(list));
+                    getFields(tipo).forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+                    if(tipo === 'obra') { limparAssinatura('signature-pad-resp'); limparAssinatura('signature-pad-contratante'); }
+                    alert('Último registro excluído.');
+                } else {
+                    alert('Nada para excluir.');
+                }
+            });
+        }
+
+        function salvarTAP() { 
+            const list = JSON.parse(localStorage.getItem('db_taps') || '[]');
+            const tapData = { 
+                nome: document.getElementById('tap-nome').value, 
+                gerente: document.getElementById('tap-gerente').value, 
+                sponsor: document.getElementById('tap-sponsor').value, 
+                justificativa: document.getElementById('tap-justificativa').value, 
+                objetivos: document.getElementById('tap-objetivos').value, 
+                premissas: document.getElementById('tap-premissas').value, 
+                stakeholders: document.getElementById('tap-stakeholders').value, 
+                orcamento: document.getElementById('tap-orcamento').value, 
+                prazo: document.getElementById('tap-prazo').value,
+                id: Date.now(),
+                savedAt: new Date().toLocaleString()
+            }; 
+            list.push(tapData);
+            localStorage.setItem('db_taps', JSON.stringify(list));
+            alert('TAP Salvo no Banco de Dados!'); 
+        }
+        
+        function carregarTAP(isEditTrigger) { 
+            const logic = () => { 
+                const list = JSON.parse(localStorage.getItem('db_taps') || '[]'); 
+                if(list.length > 0) { 
+                    const d = list[list.length - 1]; 
+                    document.getElementById('tap-nome').value = d.nome; 
+                    document.getElementById('tap-gerente').value = d.gerente; 
+                    document.getElementById('tap-sponsor').value = d.sponsor; 
+                    document.getElementById('tap-justificativa').value = d.justificativa; 
+                    document.getElementById('tap-objetivos').value = d.objetivos; 
+                    document.getElementById('tap-premissas').value = d.premissas; 
+                    document.getElementById('tap-stakeholders').value = d.stakeholders; 
+                    document.getElementById('tap-orcamento').value = d.orcamento; 
+                    document.getElementById('tap-prazo').value = d.prazo; 
+                } 
+            }; 
+            
+            if(isEditTrigger) {
+                // Botão Editar (amarelo)
+                requestJustification("Edição de TAP", logic);
+            } else {
+                logic();
+            }
+        }
+        
+        function excluirTAP() { 
+            requestJustification("Exclusão TAP", () => { 
+                const list = JSON.parse(localStorage.getItem('db_taps') || '[]');
+                if(list.length > 0) {
+                    list.pop();
+                    localStorage.setItem('db_taps', JSON.stringify(list));
+                    document.querySelectorAll('#sec-tap input, #sec-tap textarea').forEach(e=>e.value=''); 
+                    alert("Último TAP excluído."); 
+                }
+            }); 
+        }
+
+        function salvarObservacao() { 
+            const executeObs = () => {
+                const d = { 
+                    txt: document.getElementById('obra-observacao-texto').value, 
+                    local: document.getElementById('obs-local-data').value, 
+                    resp: document.getElementById('obs-resp-tecnico').value, 
+                    sign: document.getElementById('signature-pad-obs').toDataURL(),
+                    id: Date.now(),
+                    savedAt: new Date().toLocaleString()
+                }; 
+                const list = JSON.parse(localStorage.getItem('db_observacoes') || '[]');
+                list.push(d);
+                localStorage.setItem('db_observacoes', JSON.stringify(list));
+                alert("Observação salva no histórico!"); 
+            };
+            executeObs();
+        }
+
+        function salvarSMS() {
+            const executeSMS = () => {
+                const tema = document.getElementById('sms-tema').value;
+                const instrutor = document.getElementById('sms-instrutor').value;
+                const func = document.getElementById('sms-funcionarios').value;
+                if(!tema || !instrutor) return alert("Preencha Tema e Instrutor.");
+                
+                const data = {
+                    tema: tema,
+                    instrutor: instrutor,
+                    funcionarios: func,
+                    savedAt: new Date().toLocaleString()
+                };
+                
+                const list = JSON.parse(localStorage.getItem('db_seguranca') || '[]');
+                list.push(data);
+                localStorage.setItem('db_seguranca', JSON.stringify(list));
+                alert("Registro de Segurança (DDS/Treinamento) salvo!");
+                
+                document.getElementById('sms-tema').value = "";
+                document.getElementById('sms-instrutor').value = "";
+                document.getElementById('sms-funcionarios').value = "";
+            };
+            executeSMS();
+        }
+
+        function renderSMSAdmin() {
+            const tbody = document.getElementById('lista-sms-admin');
+            if(!tbody) return;
+            const list = JSON.parse(localStorage.getItem('db_seguranca') || '[]');
+            
+            if(list.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">Nenhum registro de SMS.</td></tr>';
+            } else {
+                tbody.innerHTML = list.map((item, idx) => `
+                    <tr>
+                        <td>${item.tema}</td>
+                        <td>${item.instrutor} <small>(${item.savedAt})</small></td>
+                        <td><button class="btn" style="padding: 5px 10px; font-size: 0.8rem; background: #475569;" onclick="visualizarSMS(${idx})"><i class="fas fa-eye"></i> Visualizar</button></td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        function visualizarSMS(index) {
+            const list = JSON.parse(localStorage.getItem('db_seguranca') || '[]');
+            const data = list[index];
+            if(!data) return;
+            document.getElementById('sms-tema').value = data.tema;
+            document.getElementById('sms-instrutor').value = data.instrutor;
+            document.getElementById('sms-funcionarios').value = data.funcionarios;
+            imprimirDiv('eng-seguranca', 'Registro de Segurança (SMS)');
+        }
+
+        // Função Genérica para carregar selects de obra baseado no usuário logado
+        // Serve para Fiscal e Engenheiro
+        function carregarObrasSelects() {
+            const obras = JSON.parse(localStorage.getItem('obras') || '[]');
+            const user = currentUser.name;
+            const level = currentUser.level;
+            
+            // Filtra obras onde o usuário é engenheiro ou fiscal (ou admin)
+            const allowed = obras.filter(o => {
+                if (level === 5 || level === 8) return true; 
+                const engs = Array.isArray(o.engenheiro) ? o.engenheiro : [o.engenheiro];
+                const fiscs = Array.isArray(o.fiscal) ? o.fiscal : [o.fiscal];
+                return engs.includes(user) || fiscs.includes(user);
+            });
+
+            const htmlOptions = allowed.length > 0 
+                ? allowed.map(o => `<option value="${o.nome}">${o.nome}</option>`).join('')
+                : '<option value="">Nenhuma obra vinculada</option>';
+
+            const selFoto = document.getElementById('foto-gps-obra');
+            const selOcorrencia = document.getElementById('ocorrencia-obra');
+            const selChecklist = document.getElementById('checklist-obra'); 
+            const selMedicao = document.getElementById('medicao-obra'); 
+            const selCronograma = document.getElementById('cronograma-obra'); 
+            const selAprovacao = document.getElementById('aprovacao-obra-filter'); 
+
+            if(selFoto) selFoto.innerHTML = htmlOptions;
+            if(selOcorrencia) selOcorrencia.innerHTML = htmlOptions;
+            if(selChecklist) selChecklist.innerHTML = htmlOptions; 
+            if(selMedicao) selMedicao.innerHTML = htmlOptions; 
+            if(selCronograma) selCronograma.innerHTML = htmlOptions; 
+            if(selAprovacao) selAprovacao.innerHTML = `<option value="">Todas</option>` + htmlOptions; 
+        }
+
+        function obterGPS() {
+            if (navigator.geolocation) {
+                document.getElementById('foto-gps-coords').value = "Buscando...";
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const coords = position.coords.latitude.toFixed(6) + ", " + position.coords.longitude.toFixed(6);
+                        document.getElementById('foto-gps-coords').value = coords;
+                    },
+                    (error) => {
+                        alert("Erro ao obter GPS: " + error.message + ". Usando coordenadas simuladas.");
+                        document.getElementById('foto-gps-coords').value = "-22.9068, -43.1729 (Simulado)";
+                    }
+                );
+            } else {
+                alert("Geolocalização não suportada. Usando simulado.");
+                document.getElementById('foto-gps-coords').value = "-22.9068, -43.1729 (Simulado)";
+            }
+        }
+
+        function salvarFotoGPS() {
+            const obra = document.getElementById('foto-gps-obra').value;
+            const desc = document.getElementById('foto-gps-desc').value;
+            const gps = document.getElementById('foto-gps-coords').value;
+            const data = document.getElementById('foto-gps-data').value;
+            const idx = parseInt(document.getElementById('edit-foto-index').value);
+
+            if(!obra || !desc || !data) return alert("Preencha a Obra, Descrição e Data.");
+
+            const db = JSON.parse(localStorage.getItem('db_fotos_gps') || '[]');
+            const novo = { obra, desc, gps, data, savedAt: new Date().toLocaleString() };
+
+            if(idx >= 0) {
+                db[idx] = novo;
+                localStorage.setItem('db_fotos_gps', JSON.stringify(db));
+                alert("Relatório atualizado!");
+                document.getElementById('edit-foto-index').value = "-1";
+                document.getElementById('btn-salvar-foto-gps').innerHTML = '<i class="fas fa-save"></i> Salvar Relatório';
+                document.getElementById('btn-cancelar-foto-gps').style.display = 'none';
+                document.getElementById('foto-gps-desc').value = "";
+                document.getElementById('foto-gps-coords').value = "";
+                document.getElementById('foto-gps-data').value = "";
+                renderFotoGPS();
+            } else {
+                db.push(novo);
+                localStorage.setItem('db_fotos_gps', JSON.stringify(db));
+                alert("Relatório salvo!");
+                document.getElementById('foto-gps-desc').value = "";
+                document.getElementById('foto-gps-coords').value = "";
+                document.getElementById('foto-gps-data').value = "";
+                renderFotoGPS();
+            }
+        }
+
+        function renderFotoGPS() {
+            const db = JSON.parse(localStorage.getItem('db_fotos_gps') || '[]');
+            const tbody = document.getElementById('lista-fotos-gps');
+            if(!tbody) return;
+            tbody.innerHTML = db.map((item, idx) => `
+                <tr>
+                    <td><strong>${item.obra || '-'}</strong></td>
+                    <td>${item.desc}</td>
+                    <td>${item.data}</td>
+                    <td>${item.gps || '-'}</td>
+                    <td>
+                        <div style="display:flex; gap:5px;">
+                            <button class="btn btn-warning" onclick="editarFotoGPS(${idx})" style="padding: 2px 8px; font-size: 0.8rem;"><i class="fas fa-edit"></i></button>
+                            <button class="btn btn-danger" onclick="excluirFotoGPS(${idx})" style="padding: 2px 8px; font-size: 0.8rem;"><i class="fas fa-trash"></i></button>
+                            <button class="btn" onclick="imprimirDiv('sec-relatorios-fiscal', 'Relatório Fotográfico')" style="padding: 2px 8px; font-size: 0.8rem; background: #475569;"><i class="fas fa-print"></i></button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function editarFotoGPS(idx) {
+            requestJustification("Edição Relatório Fotográfico", () => {
+                const db = JSON.parse(localStorage.getItem('db_fotos_gps') || '[]');
+                const item = db[idx];
+                document.getElementById('foto-gps-obra').value = item.obra;
+                document.getElementById('foto-gps-desc').value = item.desc;
+                document.getElementById('foto-gps-coords').value = item.gps;
+                document.getElementById('foto-gps-data').value = item.data;
+                document.getElementById('edit-foto-index').value = idx;
+                document.getElementById('btn-salvar-foto-gps').innerHTML = '<i class="fas fa-save"></i> Atualizar';
+                document.getElementById('btn-cancelar-foto-gps').style.display = 'block';
+            });
+        }
+
+        function cancelarEdicaoFotoGPS() {
+            document.getElementById('foto-gps-desc').value = "";
+            document.getElementById('foto-gps-coords').value = "";
+            document.getElementById('foto-gps-data').value = "";
+            document.getElementById('edit-foto-index').value = "-1";
+            document.getElementById('btn-salvar-foto-gps').innerHTML = '<i class="fas fa-save"></i> Salvar Relatório';
+            document.getElementById('btn-cancelar-foto-gps').style.display = 'none';
+        }
+
+        function excluirFotoGPS(idx) {
+            requestJustification("Exclusão Relatório Fotográfico", () => {
+                const db = JSON.parse(localStorage.getItem('db_fotos_gps') || '[]');
+                db.splice(idx, 1);
+                localStorage.setItem('db_fotos_gps', JSON.stringify(db));
+                renderFotoGPS();
+            });
+        }
+
+        function salvarOcorrencia() {
+            const obra = document.getElementById('ocorrencia-obra').value;
+            const assunto = document.getElementById('ocorrencia-assunto').value;
+            const data = document.getElementById('ocorrencia-data').value;
+            const obs = document.getElementById('ocorrencia-obs').value;
+            const idx = parseInt(document.getElementById('edit-ocorrencia-index').value);
+
+            if(!obra || !assunto || !data) return alert("Preencha Obra, Assunto e Data.");
+
+            const db = JSON.parse(localStorage.getItem('db_ocorrencias_fiscal') || '[]');
+            const novo = { obra, assunto, data, obs, savedAt: new Date().toLocaleString() };
+
+            if(idx >= 0) {
+                db[idx] = novo;
+                localStorage.setItem('db_ocorrencias_fiscal', JSON.stringify(db));
+                alert("Ocorrência atualizada!");
+                document.getElementById('edit-ocorrencia-index').value = "-1";
+                document.getElementById('btn-salvar-ocorrencia').innerHTML = '<i class="fas fa-save"></i> Salvar Ocorrência';
+                document.getElementById('btn-cancelar-ocorrencia').style.display = 'none';
+                document.getElementById('ocorrencia-assunto').value = "";
+                document.getElementById('ocorrencia-data').value = "";
+                document.getElementById('ocorrencia-obs').value = "";
+                renderOcorrencia();
+            } else {
+                db.push(novo);
+                localStorage.setItem('db_ocorrencias_fiscal', JSON.stringify(db));
+                alert("Ocorrência salva!");
+                document.getElementById('ocorrencia-assunto').value = "";
+                document.getElementById('ocorrencia-data').value = "";
+                document.getElementById('ocorrencia-obs').value = "";
+                renderOcorrencia();
+            }
+        }
+
+        function renderOcorrencia() {
+            const db = JSON.parse(localStorage.getItem('db_ocorrencias_fiscal') || '[]');
+            const tbody = document.getElementById('lista-ocorrencias');
+            if(!tbody) return;
+            tbody.innerHTML = db.map((item, idx) => `
+                <tr>
+                    <td><strong>${item.obra || '-'}</strong></td>
+                    <td>${item.assunto}</td>
+                    <td>${item.data}</td>
+                    <td>
+                        <div style="display:flex; gap:5px;">
+                            <button class="btn btn-warning" onclick="editarOcorrencia(${idx})" style="padding: 2px 8px; font-size: 0.8rem;"><i class="fas fa-edit"></i></button>
+                            <button class="btn btn-danger" onclick="excluirOcorrencia(${idx})" style="padding: 2px 8px; font-size: 0.8rem;"><i class="fas fa-trash"></i></button>
+                            <button class="btn" onclick="imprimirDiv('sec-relatorios-fiscal', 'Ocorrência Técnica')" style="padding: 2px 8px; font-size: 0.8rem; background: #475569;"><i class="fas fa-print"></i></button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function editarOcorrencia(idx) {
+            requestJustification("Edição Ocorrência Técnica", () => {
+                const db = JSON.parse(localStorage.getItem('db_ocorrencias_fiscal') || '[]');
+                const item = db[idx];
+                document.getElementById('ocorrencia-obra').value = item.obra;
+                document.getElementById('ocorrencia-assunto').value = item.assunto;
+                document.getElementById('ocorrencia-data').value = item.data;
+                document.getElementById('ocorrencia-obs').value = item.obs;
+                document.getElementById('edit-ocorrencia-index').value = idx;
+                document.getElementById('btn-salvar-ocorrencia').innerHTML = '<i class="fas fa-save"></i> Atualizar';
+                document.getElementById('btn-cancelar-ocorrencia').style.display = 'block';
+            });
+        }
+
+        function cancelarEdicaoOcorrencia() {
+            document.getElementById('ocorrencia-assunto').value = "";
+            document.getElementById('ocorrencia-data').value = "";
+            document.getElementById('ocorrencia-obs').value = "";
+            document.getElementById('edit-ocorrencia-index').value = "-1";
+            document.getElementById('btn-salvar-ocorrencia').innerHTML = '<i class="fas fa-save"></i> Salvar Ocorrência';
+            document.getElementById('btn-cancelar-ocorrencia').style.display = 'none';
+        }
+
+        function excluirOcorrencia(idx) {
+            requestJustification("Exclusão Ocorrência Técnica", () => {
+                const db = JSON.parse(localStorage.getItem('db_ocorrencias_fiscal') || '[]');
+                db.splice(idx, 1);
+                localStorage.setItem('db_ocorrencias_fiscal', JSON.stringify(db));
+                renderOcorrencia();
+            });
+        }
+
+        function limparAssinatura(id) { const c = document.getElementById(id); c.getContext('2d').clearRect(0,0,c.width,c.height); }
+        function setupAllSignatures() { document.querySelectorAll('canvas').forEach(c => { c.width = c.offsetWidth; c.height = c.offsetHeight; }); }
+
+        function filtrarTabelaAdmin(inputId, tbodyId) {
+            const input = document.getElementById(inputId);
+            const filter = input.value.toUpperCase();
+            const tbody = document.getElementById(tbodyId);
+            const tr = tbody.getElementsByTagName('tr');
+
+            for (let i = 0; i < tr.length; i++) {
+                const tds = tr[i].getElementsByTagName('td');
+                let found = false;
+                for (let j = 0; j < tds.length; j++) {
+                    if (tds[j]) {
+                        const txtValue = tds[j].textContent || tds[j].innerText;
+                        if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                tr[i].style.display = found ? "" : "none";
+            }
+        }
+
+        function renderTAPsAdmin() {
+            const tbody = document.getElementById('lista-taps-admin');
+            if(!tbody) return;
+            tbody.innerHTML = '';
+            
+            const docs = [
+                { key: 'db_taps', label: 'Termo de Abertura (TAP)', id: 'tap', nameField: 'nome' },
+                { key: 'db_contratos', label: 'Contrato Profissional', id: 'contrato', nameField: 'contrato-nome' },
+                { key: 'db_contratantes', label: 'Cadastro Contratante', id: 'contratante', nameField: 'contratante-nome' },
+                { key: 'db_dados_obra', label: 'Dados da Obra/Serviço', id: 'obra', nameField: 'obra-natureza' },
+                { key: 'db_observacoes', label: 'Observações Técnicas', id: 'obs', nameField: 'resp' }
+            ];
+
+            let hasContent = false;
+            let html = '';
+
+            docs.forEach(doc => {
+                const list = JSON.parse(localStorage.getItem(doc.key) || '[]');
+                list.forEach((data, index) => {
+                    let nameDisplay = 'Registro #' + (index + 1);
+                    if (doc.nameField && data[doc.nameField]) nameDisplay = data[doc.nameField];
+                    else if (doc.id === 'obs' && data.resp) nameDisplay = "Resp: " + data.resp;
+                    
+                    const dateDisplay = data.savedAt ? `<small style="display:block; color:#999;">${data.savedAt}</small>` : '';
+
+                    html += `<tr>
+                        <td><strong>${doc.label}</strong></td>
+                        <td>${nameDisplay} ${dateDisplay}</td>
+                        <td><button class="btn" style="padding: 5px 10px; font-size: 0.8rem; background: #475569;" onclick="visualizarDocumentoAdmin('${doc.id}', ${index})"><i class="fas fa-eye"></i> Visualizar</button></td>
+                    </tr>`;
+                    hasContent = true;
+                });
+            });
+
+            if(!hasContent) tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">Nenhum documento de engenharia preenchido ainda.</td></tr>';
+            else tbody.innerHTML = html;
+        }
+
+        function visualizarDocumentoAdmin(tipo, index) {
+            let dbKey = '';
+            if(tipo === 'tap') dbKey = 'db_taps';
+            else if(tipo === 'contrato') dbKey = 'db_contratos';
+            else if(tipo === 'contratante') dbKey = 'db_contratantes';
+            else if(tipo === 'obra') dbKey = 'db_dados_obra';
+            else if(tipo === 'obs') dbKey = 'db_observacoes';
+
+            const list = JSON.parse(localStorage.getItem(dbKey) || '[]');
+            const data = list[index];
+
+            if(!data) return alert('Erro ao carregar documento.');
+
+            if(tipo === 'tap') {
+                document.getElementById('tap-nome').value = data.nome; 
+                document.getElementById('tap-gerente').value = data.gerente; 
+                document.getElementById('tap-sponsor').value = data.sponsor; 
+                document.getElementById('tap-justificativa').value = data.justificativa; 
+                document.getElementById('tap-objetivos').value = data.objetivos; 
+                document.getElementById('tap-premissas').value = data.premissas; 
+                document.getElementById('tap-stakeholders').value = data.stakeholders; 
+                document.getElementById('tap-orcamento').value = data.orcamento; 
+                document.getElementById('tap-prazo').value = data.prazo; 
+                imprimirDiv('sec-tap', 'Termo de Abertura do Projeto');
+            } else if (tipo === 'obs') {
+                if(document.getElementById('obra-observacao-texto')) document.getElementById('obra-observacao-texto').value = data.txt || '';
+                if(document.getElementById('obs-local-data')) document.getElementById('obs-local-data').value = data.local || '';
+                if(document.getElementById('obs-resp-tecnico')) document.getElementById('obs-resp-tecnico').value = data.resp || '';
+                imprimirDiv('eng-observacao', 'Observações Técnicas');
+            } else {
+                getFields(tipo).forEach(id => { const el = document.getElementById(id); if(el && data[id]) el.value = data[id]; });
+                let titulo = ''; let divId = '';
+                if(tipo === 'contrato') { titulo = 'Contrato Profissional'; divId = 'sec-contrato-prof'; }
+                if(tipo === 'contratante') { titulo = 'Cadastro Contratante'; divId = 'eng-contratante'; }
+                if(tipo === 'obra') { titulo = 'Dados da Obra'; divId = 'eng-dados-obra'; }
+                imprimirDiv(divId, titulo);
+            }
+        }
+
+        function renderUsuarios(filterLevel = null) {
+            const users = JSON.parse(localStorage.getItem('usuarios'));
+            let html = '';
+            renderUserGroupFilters(filterLevel);
+
+            for(let u in users) {
+                const level = parseInt(users[u].level);
+                if (filterLevel !== null && filterLevel !== 'all') {
+                    if (filterLevel === 'operacional') { if (level !== 6 && level !== 7) continue; } 
+                    else if (filterLevel === 'admin') { if (level !== 5 && level !== 8) continue; } 
+                    else if (level !== parseInt(filterLevel)) continue;
+                }
+                let perfil = "Visitante";
+                if(level == 5) perfil = "Administrador"; else if(level == 8) perfil = "Administrador (Restrito)";
+                else if(level == 4) perfil = "Empreiteiro"; else if(level == 3) perfil = "Engenheiro"; 
+                else if(level == 2) perfil = "Gestão Fiscal"; else if(level == 6) perfil = "Almoxarifado"; 
+                else if(level == 7) perfil = "Pedreiro";
+                
+                let perms = users[u].permissions ? users[u].permissions.join(', ') : 'Padrão';
+                let phone = users[u].phone || '-';
+                html += `<tr><td>${u} <small>(${perms})</small></td><td>${phone}</td><td>${perfil}</td><td><button class="btn btn-warning" onclick="editarUsuario('${u}')" style="padding:4px 8px;"><i class="fas fa-edit"></i></button><button class="btn btn-danger" onclick="excluirUsuario('${u}')" style="padding:4px 8px; margin-left:5px;"><i class="fas fa-trash"></i></button></td></tr>`;
+            }
+            document.getElementById('lista-usuarios').innerHTML = html || '<tr><td colspan="4" style="text-align:center;">Nenhum usuário encontrado.</td></tr>';
+        }
+
+        function renderUserGroupFilters(currentFilter) {
+            const users = JSON.parse(localStorage.getItem('usuarios'));
+            const counts = { all: 0, admin: 0, 3: 0, 2: 0, 4: 0, operacional: 0 };
+            for(let u in users) {
+                counts.all++;
+                const l = parseInt(users[u].level);
+                if(l === 3) counts[3]++; if(l === 2) counts[2]++; if(l === 4) counts[4]++;
+                if(l === 5 || l === 8) counts.admin++; if(l === 6 || l === 7) counts.operacional++;
+            }
+            const groups = [
+                { id: 'all', label: 'Todos', count: counts.all }, { id: 'admin', label: 'Administradores', count: counts.admin },
+                { id: '3', label: 'Engenharia', count: counts[3] }, { id: '2', label: 'Fiscal', count: counts[2] },
+                { id: '4', label: 'Empreiteiros', count: counts[4] }, { id: 'operacional', label: 'Operacional', count: counts.operacional }
+            ];
+            document.getElementById('user-group-filters').innerHTML = groups.map(g => `<div class="group-filter-btn ${currentFilter == g.id || (currentFilter == null && g.id == 'all') ? 'active' : ''}" onclick="renderUsuarios('${g.id}')">${g.label} <span class="group-count">${g.count}</span></div>`).join('');
+        }
+
+        function editarUsuario(u) {
+            requestJustification("Edição de Usuário", () => {
+                const users = JSON.parse(localStorage.getItem('usuarios'));
+                const user = users[u];
+                document.getElementById('new-user-name').value = u; document.getElementById('new-user-name').readOnly = true; document.getElementById('new-user-name').style.backgroundColor = "#e2e8f0";
+                document.getElementById('new-user-pass').value = user.pass; document.getElementById('new-user-level').value = user.level;
+                document.getElementById('new-user-phone').value = user.phone || "";
+                document.getElementById('btn-salvar-user').innerText = "Atualizar";
+                document.getElementById('btn-cancelar-user').style.display = 'block';
+                const perms = user.permissions || [];
+                document.getElementById('perm-fiscal').checked = perms.includes('fiscal'); document.getElementById('perm-eng').checked = perms.includes('engenharia'); document.getElementById('perm-admin').checked = perms.includes('admin'); document.getElementById('perm-emp').checked = perms.includes('empreiteiro');
+                document.getElementById('perm-alm').checked = perms.includes('almoxarifado'); document.getElementById('perm-ped').checked = perms.includes('pedreiro');
+            });
+        }
+        function excluirUsuario(u) { if(u === currentUser.name) return alert("Erro: Não pode excluir a si mesmo."); requestJustification("Exclusão Usuário", () => { const users = JSON.parse(localStorage.getItem('usuarios')); delete users[u]; localStorage.setItem('usuarios', JSON.stringify(users)); renderUsuarios(); renderCustomSelects(); alert("Excluído."); }); }
+        function cancelarEdicaoUsuario() { document.getElementById('new-user-name').value = ""; document.getElementById('new-user-name').readOnly = false; document.getElementById('new-user-name').style.backgroundColor = ""; document.getElementById('new-user-pass').value = ""; document.getElementById('new-user-phone').value = ""; document.getElementById('btn-salvar-user').innerText = "Salvar Usuário"; document.getElementById('btn-cancelar-user').style.display = 'none'; document.querySelectorAll('#form-usuario input[type=checkbox]').forEach(c => c.checked = false); }
+        function salvarUsuario() {
+            const u = document.getElementById('new-user-name').value; const p = document.getElementById('new-user-pass').value; const l = document.getElementById('new-user-level').value; const ph = document.getElementById('new-user-phone').value;
+            
+            // Verifica se é edição (campo nome readonly)
+            const isEdit = document.getElementById('new-user-name').readOnly;
+
+            const executeSaveUser = () => {
+                const perms = []; 
+                if(document.getElementById('perm-fiscal').checked) perms.push('fiscal'); if(document.getElementById('perm-eng').checked) perms.push('engenharia'); 
+                if(document.getElementById('perm-admin').checked) perms.push('admin'); if(document.getElementById('perm-emp').checked) perms.push('empreiteiro');
+                if(document.getElementById('perm-alm').checked) perms.push('almoxarifado'); if(document.getElementById('perm-ped').checked) perms.push('pedreiro');
+                if(parseInt(l) === 6 && !perms.includes('almoxarifado')) perms.push('almoxarifado'); if(parseInt(l) === 7 && !perms.includes('pedreiro')) perms.push('pedreiro');
+                if(!u || !p) return alert("Preencha campos"); 
+                const users = JSON.parse(localStorage.getItem('usuarios')); 
+                users[u] = {pass: p, level: parseInt(l), permissions: perms, phone: ph}; 
+                localStorage.setItem('usuarios', JSON.stringify(users)); 
+                cancelarEdicaoUsuario(); renderUsuarios(); renderCustomSelects(); alert("Salvo!");
+            };
+
+            executeSaveUser();
+        }
+
+        function toggleDropdown(type) { document.getElementById(`dropdown-${type}`).classList.toggle("show"); }
+        function filterList(type) {
+            const input = document.querySelector(`#dropdown-${type} .search-box`);
+            const filter = input.value.toUpperCase();
+            const list = document.getElementById(`list-${type}`);
+            const items = list.getElementsByClassName("option-item");
+            for (let i = 0; i < items.length; i++) {
+                const label = items[i].getElementsByTagName("label")[0];
+                const txtValue = label.textContent || label.innerText;
+                items[i].style.display = txtValue.toUpperCase().indexOf(filter) > -1 ? "" : "none";
+            }
+        }
+        function renderCustomSelects() {
+            const users = JSON.parse(localStorage.getItem('usuarios'));
+            const listEng = document.getElementById('list-eng'); const listFiscal = document.getElementById('list-fiscal');
+            if(!listEng || !listFiscal) return;
+            listEng.innerHTML = ""; listFiscal.innerHTML = "";
+            const itemAdmin = (type) => `<div class="option-item" onclick="toggleCheckbox(this, '${type}')"><input type="checkbox" value="admin" onchange="updateDisplay('${type}')"><label>admin (Admin)</label></div>`;
+            listEng.innerHTML += itemAdmin('eng'); listFiscal.innerHTML += itemAdmin('fiscal');
+            for(let u in users) {
+                if(u === 'admin') continue;
+                if(users[u].level === 3 || users[u].level === 5 || users[u].level === 8) listEng.innerHTML += `<div class="option-item" onclick="toggleCheckbox(this, 'eng')"><input type="checkbox" value="${u}" onchange="updateDisplay('eng')"><label>${u}</label></div>`;
+                if(users[u].level === 2 || users[u].level === 5 || users[u].level === 8) listFiscal.innerHTML += `<div class="option-item" onclick="toggleCheckbox(this, 'fiscal')"><input type="checkbox" value="${u}" onchange="updateDisplay('fiscal')"><label>${u}</label></div>`;
+            }
+        }
+        function toggleCheckbox(div, type) { if(event.target.tagName === 'INPUT') { updateDisplay(type); return; } const cb = div.querySelector('input'); cb.checked = !cb.checked; updateDisplay(type); }
+        function updateDisplay(type) {
+            const container = document.getElementById(`list-${type}`); const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked'); const display = document.getElementById(`display-${type}`);
+            if(checkboxes.length === 0) display.innerText = "Selecione..."; else if (checkboxes.length <= 2) display.innerText = Array.from(checkboxes).map(cb => cb.value).join(", "); else display.innerText = `${checkboxes.length} selecionados`;
+        }
+        function getSelectedValues(type) { const container = document.getElementById(`list-${type}`); const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked'); return Array.from(checkboxes).map(cb => cb.value); }
+        function setSelectedValues(type, values) {
+            const container = document.getElementById(`list-${type}`); const checkboxes = container.querySelectorAll('input[type="checkbox"]'); const arr = Array.isArray(values) ? values : [values];
+            checkboxes.forEach(cb => { cb.checked = arr.includes(cb.value); }); updateDisplay(type);
+        }
+
+        function renderObrasHome() {
+            const container = document.getElementById('lista-obras-home');
+            if (!container || !currentUser) return;
+            
+            const obras = JSON.parse(localStorage.getItem('obras') || '[]');
+            const user = currentUser.name;
+            const level = currentUser.level;
+            
+            const allowed = obras.filter(o => {
+                if (level === 5 || level === 8) return true; 
+                const engs = Array.isArray(o.engenheiro) ? o.engenheiro : [o.engenheiro];
+                const fiscs = Array.isArray(o.fiscal) ? o.fiscal : [o.fiscal];
+                return engs.includes(user) || fiscs.includes(user);
+            });
+
+            if(allowed.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: var(--text-muted);">Você não possui obras vinculadas.</p>';
+                return;
+            }
+
+            container.innerHTML = allowed.map(o => {
+                const imgThumb = o.fotoBase64 
+                    ? `<img src="${o.fotoBase64}" class="obra-img-thumb" alt="Foto">`
+                    : `<div class="obra-img-thumb"><i class="fas fa-image"></i></div>`;
+                const roleInfo = (level === 5 || level === 8) ? "Administrador" : "Acesso Vinculado";
+                return `
+                <div class="obra-card-home">
+                    ${imgThumb}
+                    <div class="obra-info">
+                        <h4>${o.nome}</h4>
+                        <p>${roleInfo} • Contrato: ${o.valorContrato ? 'R$ ' + o.valorContrato : 'N/A'}</p>
+                    </div>
+                    <i class="fas fa-chevron-right" style="margin-left: auto; color: var(--text-muted);"></i>
+                </div>
+                `;
+            }).join('');
+        }
+
+        function adicionarObra() {
+            const nome = document.getElementById('new-obra-nome').value; 
+            if(!nome) return alert("Insira o nome da Obra");
+            
+            const engenheiros = getSelectedValues('eng'); 
+            const fiscais = getSelectedValues('fiscal');
+            if(engenheiros.length === 0) return alert("Selecione pelo menos um Engenheiro."); 
+            if(fiscais.length === 0) return alert("Selecione pelo menos um Fiscal.");
+
+            const fileInput = document.getElementById('new-obra-foto');
+            const reader = new FileReader();
+
+            const finishSave = (fotoBase64) => {
+                const obras = JSON.parse(localStorage.getItem('obras') || '[]'); 
+                const editIndex = parseInt(document.getElementById('edit-obra-index').value);
+                
+                const novaObra = { 
+                    nome: nome, 
+                    engenheiro: engenheiros, 
+                    fiscal: fiscais, 
+                    alvara: document.getElementById('new-obra-alvara').value, 
+                    licenca: document.getElementById('new-obra-licenca').value, 
+                    valorContrato: document.getElementById('new-obra-valor-contrato').value, 
+                    valorMedido: document.getElementById('new-obra-valor-medido').value,
+                    fotoBase64: fotoBase64 || null 
+                };
+
+                if(editIndex >= 0) { 
+                    const obraAntiga = obras[editIndex]; 
+                    if (!fotoBase64 && obraAntiga.fotoBase64) novaObra.fotoBase64 = obraAntiga.fotoBase64;
+                    obras[editIndex] = { ...obraAntiga, ...novaObra }; 
+                    localStorage.setItem('obras', JSON.stringify(obras)); 
+                    alert("Obra atualizada!"); 
+                    location.reload();
+                } else { 
+                    obras.push(novaObra); 
+                    localStorage.setItem('obras', JSON.stringify(obras)); 
+                    alert("Obra cadastrada!"); 
+                    location.reload();
+                }
+            };
+
+            if (fileInput.files && fileInput.files[0]) {
+                reader.onloadend = function() {
+                    finishSave(reader.result); 
+                }
+                reader.readAsDataURL(fileInput.files[0]);
+            } else {
+                finishSave(null);
+            }
+        }
+
+        function editarObra(index) {
+            requestJustification("Edição de Obra", () => {
+                const obras = JSON.parse(localStorage.getItem('obras')); const obra = obras[index];
+                document.getElementById('edit-obra-index').value = index; document.getElementById('new-obra-nome').value = obra.nome;
+                setSelectedValues('eng', obra.engenheiro); setSelectedValues('fiscal', obra.fiscal);
+                document.getElementById('new-obra-alvara').value = obra.alvara; document.getElementById('new-obra-licenca').value = obra.licenca; document.getElementById('new-obra-valor-contrato').value = obra.valorContrato; document.getElementById('new-obra-valor-medido').value = obra.valorMedido;
+                document.getElementById('titulo-obra-form').innerHTML = '<i class="fas fa-edit"></i> Editar Obra'; document.getElementById('btn-salvar-obra').innerText = 'Atualizar Obra'; document.getElementById('btn-cancelar-obra').style.display = 'block'; document.getElementById('gestao').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        }
+        function cancelarEdicaoObra() { document.getElementById('form-obra').reset(); document.getElementById('edit-obra-index').value = "-1"; setSelectedValues('eng', []); setSelectedValues('fiscal', []); document.getElementById('titulo-obra-form').innerHTML = '<i class="fas fa-city"></i> Cadastrar Nova Obra'; document.getElementById('btn-salvar-obra').innerText = 'Salvar Obra'; document.getElementById('btn-cancelar-obra').style.display = 'none'; }
+        function renderObrasGestao() {
+            const obras = JSON.parse(localStorage.getItem('obras')); const users = JSON.parse(localStorage.getItem('usuarios')); const container = document.getElementById('lista-obras-gestao');
+            if(container) {
+                container.innerHTML = obras.map((o, idx) => {
+                    const formatList = (list) => { const arr = Array.isArray(list) ? list : [list]; return arr.map(u => `<div style="margin-bottom:4px;">${u} <small style="color:var(--text-muted);">(${users[u] && users[u].phone ? users[u].phone : 'Sem tel'})</small></div>`).join(''); };
+                    return `<tr><td>${o.nome}</td><td>${formatList(o.engenheiro)}</td><td>${formatList(o.fiscal)}</td><td><button class="btn btn-warning" onclick="editarObra(${idx})" style="padding: 5px 10px;"><i class="fas fa-edit"></i></button></td></tr>`;
+                }).join('');
+            }
+            if(currentUser && (currentUser.level === 5 || currentUser.level === 8)) renderTAPsAdmin();
+        }
+        function carregarObras() {
+            const obras = JSON.parse(localStorage.getItem('obras')); const select = document.getElementById('rdo-obra'); 
+            if(select) { 
+                const allowed = obras.filter(o => { const e = Array.isArray(o.engenheiro)?o.engenheiro:[o.engenheiro]; const f = Array.isArray(o.fiscal)?o.fiscal:[o.fiscal]; return (currentUser.level===5 || currentUser.level===8) || e.includes(currentUser.name) || f.includes(currentUser.name); });
+                select.innerHTML = allowed.map(o => `<option>${o.nome}</option>`).join(''); 
+            }
+        }
+
+        // --- FUNÇÃO DE FILTRO PARA CHECKLISTS ---
+        function filtrarChecklists() {
+            const input = document.getElementById('search-checklist-obra');
+            const filter = input.value.toUpperCase();
+            const table = document.getElementById('table-checklists-fiscal');
+            const tr = table.getElementsByTagName('tr');
+
+            for (let i = 0; i < tr.length; i++) {
+                const td = tr[i].getElementsByTagName('td')[0]; // Coluna 0 é a Obra
+                if (td) {
+                    const txtValue = td.textContent || td.innerText;
+                    if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                        tr[i].style.display = "";
+                    } else {
+                        tr[i].style.display = "none";
+                    }
+                }        
+            }
+        }
+
+        // --- SALVAR CHECKLIST ATUALIZADO ---
+        function salvarChecklist() {
+            const idx = parseInt(document.getElementById('checklist-edit-index').value); 
+            const tipo = document.getElementById('checklist-tipo').value; 
+            const obra = document.getElementById('checklist-obra').value;
+            // Novos Campos
+            const refTecnica = document.getElementById('checklist-ref-tecnica').value;
+            const parecer = document.getElementById('checklist-parecer').value;
+            const justificativa = document.getElementById('checklist-justificativa').value; // Novo
+            const obsParecer = document.getElementById('checklist-obs-parecer').value; // Novo
+            const recebimento = document.getElementById('checklist-recebimento').value; // Novo
+            const fileInput = document.getElementById('checklist-fotos');
+            
+            if(!obra) return alert("Selecione uma Obra.");
+            
+            // Função para ler arquivos (Simulação)
+            const readFiles = (input) => {
+                return new Promise((resolve) => {
+                    if (!input.files || input.files.length === 0) return resolve(null);
+                    resolve("Fotos Anexadas: " + input.files.length + " arq(s)");
+                });
+            };
+
+            readFiles(fileInput).then(fotosInfo => {
+                const checks = JSON.parse(localStorage.getItem('checklists'));
+                const novoRegistro = {
+                    obra, 
+                    tipo,
+                    refTecnica, 
+                    parecer,
+                    justificativa, // Save Justificativa
+                    obsParecer,    // Save Observation
+                    recebimento,   // Save Recebimento
+                    data: new Date().toLocaleDateString(),
+                    fotosInfo: fotosInfo 
+                };
+
+                if(idx >= 0) { 
+                    if(!fotosInfo && checks[idx].fotosInfo) novoRegistro.fotosInfo = checks[idx].fotosInfo;
+                    checks[idx] = novoRegistro; 
+                    localStorage.setItem('checklists', JSON.stringify(checks)); 
+                    alert("Checklist Atualizado!"); 
+                    document.getElementById('checklist-edit-index').value = "-1"; 
+                } else { 
+                    checks.push(novoRegistro); 
+                    localStorage.setItem('checklists', JSON.stringify(checks)); 
+                    alert("Checklist Salvo!"); 
+                }
+                
+                // Limpar campos
+                document.getElementById('checklist-fotos').value = "";
+                document.getElementById('checklist-ref-tecnica').value = "";
+                document.getElementById('checklist-parecer').value = "";
+                document.getElementById('checklist-justificativa').value = "";
+                document.getElementById('checklist-obs-parecer').value = "";
+                document.getElementById('checklist-recebimento').value = "";
+                renderChecklistFiscal(); 
+                renderHistorico();
+            });
+        }
+
+        function renderChecklistFiscal() {
+            const checks = JSON.parse(localStorage.getItem('checklists'));
+            document.getElementById('table-checklists-fiscal').innerHTML = checks.map((c, idx) => `
+                <tr>
+                    <td><strong>${c.obra || '-'}</strong></td> 
+                    <td>${c.tipo}</td>
+                    <td>${c.data}</td>
+                    <td>
+                        <div style="display:flex; gap:5px;">
+                            <button class="btn btn-warning" onclick="carregarParaEdicaoChecklist(${idx})" style="padding: 2px 8px; font-size: 0.8rem;"><i class="fas fa-edit"></i> Editar</button>
+                            <button class="btn btn-danger" onclick="excluirChecklistFiscal(${idx})" style="padding: 2px 8px; font-size: 0.8rem;"><i class="fas fa-trash"></i> Excluir</button>
+                            <button class="btn" onclick="imprimirItemFiscal('Checklist', ${idx})" style="padding: 2px 8px; font-size: 0.8rem; background: #475569;"><i class="fas fa-print"></i> Imprimir</button>
+                        </div>
+                    </td>
+                </tr>`).join('');
+            
+            filtrarChecklists();
+        }
+
+        function carregarParaEdicaoChecklist(idx) { 
+            requestJustification("Edição Checklist", () => {
+                const checks = JSON.parse(localStorage.getItem('checklists')); 
+                const item = checks[idx]; 
+                document.getElementById('checklist-tipo').value = item.tipo; 
+                if(item.obra) document.getElementById('checklist-obra').value = item.obra;
+                // Carregar Novos Campos
+                document.getElementById('checklist-ref-tecnica').value = item.refTecnica || "";
+                document.getElementById('checklist-parecer').value = item.parecer || "";
+                document.getElementById('checklist-justificativa').value = item.justificativa || "";
+                document.getElementById('checklist-obs-parecer').value = item.obsParecer || "";
+                document.getElementById('checklist-recebimento').value = item.recebimento || "";
+                
+                document.getElementById('checklist-edit-index').value = idx; 
+                document.getElementById('btn-salvar-checklist').innerHTML = '<i class="fas fa-save"></i> Atualizar Inspeção'; 
+            });
+        }
+        function excluirChecklistFiscal(idx) { 
+            requestJustification("Exclusão Checklist", () => { 
+                const checks = JSON.parse(localStorage.getItem('checklists')); checks.splice(idx, 1); localStorage.setItem('checklists', JSON.stringify(checks)); renderChecklistFiscal(); renderHistorico(); 
+            }); 
+        }
+        
+        function salvarMedicao() {
+            const idx = parseInt(document.getElementById('medicao-edit-index').value); 
+            const item = document.getElementById('medicao-item').value; 
+            const qtd = document.getElementById('medicao-qtd').value;
+            const obs = document.getElementById('medicao-obs').value;
+            const obra = document.getElementById('medicao-obra').value; // NOVA CAPTURA
+
+            if(!item || !qtd || !obra) return alert("Preencha todos os campos (Obra, Item, Qtd)."); 
+            const medicoes = JSON.parse(localStorage.getItem('medicoes'));
+            
+            if(idx >= 0) { 
+                requestJustification("Edição Medição", () => {
+                    medicoes[idx] = {obra, item, qtd, obs, data: new Date().toLocaleDateString()}; 
+                    localStorage.setItem('medicoes', JSON.stringify(medicoes));
+                    alert("Atualizado!"); 
+                    // Limpar e resetar
+                    document.getElementById('medicao-edit-index').value = "-1"; 
+                    document.getElementById('medicao-item').value = "";
+                    document.getElementById('medicao-qtd').value = "";
+                    document.getElementById('medicao-obs').value = "";
+                    document.getElementById('btn-salvar-medicao').innerHTML = '<i class="fas fa-save"></i> Salvar Medição';
+                    renderMedicoes();
+                });
+            } else { 
+                medicoes.push({obra, item, qtd, obs, data: new Date().toLocaleDateString()}); 
+                localStorage.setItem('medicoes', JSON.stringify(medicoes));
+                alert("Salvo!"); 
+                // Limpar campos
+                document.getElementById('medicao-item').value = "";
+                document.getElementById('medicao-qtd').value = "";
+                document.getElementById('medicao-obs').value = "";
+                renderMedicoes();
+            }
+        }
+        function renderMedicoes() { 
+            const ms = JSON.parse(localStorage.getItem('medicoes')); 
+            document.getElementById('lista-medicoes').innerHTML = ms.map((m, idx) => `
+                <tr>
+                    <td><strong>${m.obra || '-'}</strong></td>
+                    <td>${m.item}</td>
+                    <td>${m.qtd}</td>
+                    <td>${m.obs || '-'}</td>
+                    <td>${m.data}</td>
+                    <td>
+                        <div style="display:flex; gap:5px;">
+                            <button class="btn btn-warning" onclick="carregarParaEdicaoMedicao(${idx})" style="padding: 2px 8px; font-size: 0.8rem;"><i class="fas fa-edit"></i> Editar</button>
+                            <button class="btn btn-danger" onclick="excluirMedicaoFiscal(${idx})" style="padding: 2px 8px; font-size: 0.8rem;"><i class="fas fa-trash"></i> Excluir</button>
+                            <button class="btn" onclick="imprimirItemFiscal('Medição', ${idx})" style="padding: 2px 8px; font-size: 0.8rem; background: #475569;"><i class="fas fa-print"></i> Imprimir</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join(''); 
+        }
+        function carregarParaEdicaoMedicao(idx) { 
+            requestJustification("Edição Medição", () => {
+                const ms = JSON.parse(localStorage.getItem('medicoes')); 
+                document.getElementById('medicao-item').value = ms[idx].item; 
+                document.getElementById('medicao-qtd').value = ms[idx].qtd; 
+                document.getElementById('medicao-obs').value = ms[idx].obs || ""; 
+                if(ms[idx].obra) document.getElementById('medicao-obra').value = ms[idx].obra;
+                document.getElementById('medicao-edit-index').value = idx; 
+                document.getElementById('btn-salvar-medicao').innerHTML = '<i class="fas fa-save"></i> Atualizar Medição'; 
+            });
+        }
+        function excluirMedicaoFiscal(idx) { 
+            requestJustification("Exclusão Medição", () => { 
+                const ms = JSON.parse(localStorage.getItem('medicoes')); ms.splice(idx, 1); localStorage.setItem('medicoes', JSON.stringify(ms)); renderMedicoes(); 
+            }); 
+        }
+
+        function adicionarItemEstoque() { const nome = document.getElementById('alm-item-nome').value; const cat = document.getElementById('alm-item-cat').value; const qtd = parseInt(document.getElementById('alm-item-qtd').value); if(!nome || !qtd) return alert("Preencha"); const estoque = JSON.parse(localStorage.getItem('estoque_geral')); estoque.push({nome, cat, qtd}); localStorage.setItem('estoque_geral', JSON.stringify(estoque)); renderEstoqueAlmoxarifado(); alert("Adicionado!"); }
+        function renderEstoqueAlmoxarifado() { const estoque = JSON.parse(localStorage.getItem('estoque_geral')); document.getElementById('lista-estoque-alm').innerHTML = estoque.map(e => `<tr><td>${e.nome}</td><td>${e.cat}</td><td>${e.qtd}</td></tr>`).join(''); }
+        function preencherSelectItensPedreiro() { const estoque = JSON.parse(localStorage.getItem('estoque_geral')); document.getElementById('ped-item-select').innerHTML = estoque.map(e => `<option value="${e.nome}">${e.nome} (${e.cat})</option>`).join(''); }
+        function realizarSolicitacao() { const itemNome = document.getElementById('ped-item-select').value; const qtd = parseInt(document.getElementById('ped-item-qtd').value); const tipo = document.getElementById('ped-tipo-req').value; if(!itemNome || !qtd) return alert("Preencha"); if (tipo.includes("Empréstimo")) { const tools = JSON.parse(localStorage.getItem('solicitacoes_ferramentas')); tools.push({item: itemNome, user: currentUser.name, data: new Date().toLocaleDateString(), status: 'Em uso'}); localStorage.setItem('solicitacoes_ferramentas', JSON.stringify(tools)); renderMinhasFerramentas(); alert("Solicitado!"); } else { alert("Solicitação de consumo enviada!"); } }
+        function renderMinhasFerramentas() { const tools = JSON.parse(localStorage.getItem('solicitacoes_ferramentas')); const minhas = tools.filter(t => t.user === currentUser.name && t.status === 'Em uso'); document.getElementById('lista-minhas-ferramentas').innerHTML = minhas.map((t, idx) => `<tr><td>${t.item}</td><td>${t.data}</td><td><button class="btn btn-warning" onclick="devolverFerramenta('${t.item}')">Devolver</button></td></tr>`).join(''); }
+        function devolverFerramenta(nomeItem) { 
+            requestJustification("Devolução de Ferramenta", () => {
+                const tools = JSON.parse(localStorage.getItem('solicitacoes_ferramentas')); const idx = tools.findIndex(t => t.user === currentUser.name && t.item === nomeItem && t.status === 'Em uso'); if(idx > -1) { tools[idx].status = 'Devolvido'; localStorage.setItem('solicitacoes_ferramentas', JSON.stringify(tools)); renderMinhasFerramentas(); alert("Devolvida!"); } 
+            });
+        }
+        function renderFerramentasUso() { const tools = JSON.parse(localStorage.getItem('solicitacoes_ferramentas')); const emUso = tools.filter(t => t.status === 'Em uso'); document.getElementById('lista-ferramentas-uso').innerHTML = emUso.map(t => `<tr><td>${t.item}</td><td>${t.user}</td><td>${t.data}</td><td><span style="color:red">Em Uso</span></td></tr>`).join(''); }
+        
+        function renderHistorico() {
+            const lista = document.getElementById('lista-historico');
+            const dados = JSON.parse(localStorage.getItem('relatorios') || '[]');
+            const tbody = document.getElementById('corpo-historico');
+            if(!tbody) return;
+            tbody.innerHTML = dados.map(r => `<tr><td>${r.data}</td><td>RDO</td><td>${r.obra}</td><td>-</td></tr>`).join('');
+        }
+            
+        function abrirItem(type, idx) {
+            const content = document.getElementById('print-content'); 
+            if (type === 'Checklist') { 
+                const c = JSON.parse(localStorage.getItem('checklists'))[idx]; 
+                content.innerHTML = `
+                    <h2>Checklist Digital</h2>
+                    <hr>
+                    <p><strong>Obra:</strong> ${c.obra || 'Não informada'}</p>
+                    <p><strong>Data:</strong> ${c.data}</p>
+                    <p><strong>Tipo de Inspeção:</strong> ${c.tipo}</p>
+                    <hr>
+                    <h4>Detalhamento Fiscal</h4>
+                    <p><strong>Referência Técnica:</strong> ${c.refTecnica || 'N/A'}</p>
+                    <p><strong>Parecer Técnico:</strong> ${c.parecer || 'N/A'}</p>
+                    <p><strong>Justificativa:</strong> ${c.justificativa || 'N/A'}</p>
+                    <p><strong>Recebimento:</strong> ${c.recebimento || 'N/A'}</p>
+                    <div style="margin-top:10px; padding:10px; background:#f9f9f9; border:1px solid #eee;">
+                        <strong>Observações:</strong><br>
+                        ${c.obsParecer || 'Sem observações.'}
+                    </div>
+                    ${c.fotosInfo ? `<p><strong>Anexos:</strong> ${c.fotosInfo}</p>` : ''}
+                `; 
+            } else if (type === 'Medição') { 
+                const m = JSON.parse(localStorage.getItem('medicoes'))[idx]; 
+                content.innerHTML = `<h2>Medição</h2><p><strong>Obra:</strong> ${m.obra || '-'}</p><p>${m.data}</p><p>${m.item} - ${m.qtd}</p><p>Obs: ${m.obs || ''}</p>`; 
+            }
+            document.getElementById('print-modal').style.display = 'block';
+        }
+        function imprimirItem(type, idx) { abrirItem(type, idx); setTimeout(() => window.print(), 500); }
+        function imprimirDiv(divId, titulo) { const originalDiv = document.getElementById(divId); const clone = originalDiv.cloneNode(true); const buttons = clone.querySelectorAll('button'); buttons.forEach(btn => btn.remove()); const origInputs = originalDiv.querySelectorAll('input, textarea, select'); const cloneInputs = clone.querySelectorAll('input, textarea, select'); for(let i=0; i<origInputs.length; i++) { if(origInputs[i].type !== 'file' && origInputs[i].type !== 'hidden') { if(origInputs[i].type === 'checkbox') { cloneInputs[i].checked = origInputs[i].checked; if(origInputs[i].checked) cloneInputs[i].setAttribute('checked', 'checked'); } else { cloneInputs[i].value = origInputs[i].value; const p = document.createElement('p'); p.style.fontWeight = "bold"; p.style.borderBottom = "1px solid #ccc"; p.innerText = origInputs[i].value; if(cloneInputs[i].tagName === 'SELECT') { p.innerText = origInputs[i].options[origInputs[i].selectedIndex].text; } cloneInputs[i].parentNode.replaceChild(p, cloneInputs[i]); } } } const origCanvas = originalDiv.querySelectorAll('canvas'); const cloneCanvas = clone.querySelectorAll('canvas'); for(let i=0; i<origCanvas.length; i++) { const img = document.createElement('img'); img.src = origCanvas[i].toDataURL(); img.style.border = "1px solid #ccc"; img.style.maxHeight = "100px"; cloneCanvas[i].parentNode.replaceChild(img, cloneCanvas[i]); } document.getElementById('print-content').innerHTML = `<h2>${titulo}</h2><hr>${clone.innerHTML}`; document.getElementById('print-modal').style.display = 'block'; }
+        function imprimirItemFiscal(type, idx) { abrirItem(type, idx); }
+        
+        function salvarRDO(e) { e.preventDefault(); alert("RDO Salvo (Simulação)"); location.reload(); }
+        function cancelarEdicaoRDO() { document.getElementById('form-rdo').reset(); showSection('historico'); }
+        function atualizarDashboard() { document.getElementById('dash-obras').innerText = JSON.parse(localStorage.getItem('obras')).length; }
+        
+        function renderAprovacoes() { 
+            const filtro = document.getElementById('aprovacao-obra-filter');
+            const obraSelecionada = filtro ? filtro.value : "";
+            
+            // Dados das fontes solicitadas (Exceto RDO)
+            const checklists = JSON.parse(localStorage.getItem('checklists') || '[]');
+            const fotosGPS = JSON.parse(localStorage.getItem('db_fotos_gps') || '[]');
+            const ocorrencias = JSON.parse(localStorage.getItem('db_ocorrencias_fiscal') || '[]');
+            const medicoes = JSON.parse(localStorage.getItem('medicoes') || '[]');
+
+            let pendencias = [];
+
+            // Helper para filtrar aprovados
+            const isPending = (item) => !item.status || item.status !== 'Aprovado';
+
+            // 1. Adicionar Checklists
+            checklists.forEach((c, idx) => {
+                if(isPending(c)) {
+                    pendencias.push({
+                        id: `CHK-${idx+1}`,
+                        obra: c.obra || 'N/A',
+                        data: c.data,
+                        status: 'Pendente',
+                        type: 'Checklist',
+                        index: idx
+                    });
+                }
+            });
+
+            // 2. Adicionar Relatórios Fotográficos (Campo)
+            fotosGPS.forEach((f, idx) => {
+                if(isPending(f)) {
+                    pendencias.push({
+                        id: `FOTO-${idx+1}`,
+                        obra: f.obra || 'N/A',
+                        data: f.data,
+                        status: 'Em Análise',
+                        type: 'Relatório Fotográfico',
+                        index: idx
+                    });
+                }
+            });
+
+            // 3. Adicionar Ocorrências Técnicas (Campo)
+            ocorrencias.forEach((o, idx) => {
+                if(isPending(o)) {
+                    pendencias.push({
+                        id: `OCO-${idx+1}`,
+                        obra: o.obra || 'N/A',
+                        data: o.data,
+                        status: 'Crítico',
+                        type: 'Ocorrência Técnica',
+                        index: idx
+                    });
+                }
+            });
+
+            // 4. Adicionar Medições
+            medicoes.forEach((m, idx) => {
+                if(isPending(m)) {
+                    pendencias.push({
+                        id: `MED-${idx+1}`,
+                        obra: m.obra || 'N/A',
+                        data: m.data,
+                        status: 'Em Análise',
+                        type: 'Medição',
+                        index: idx
+                    });
+                }
+            });
+
+            // Filtragem por Obra (se selecionado) ou por permissão do usuário
+            const obrasUser = JSON.parse(localStorage.getItem('obras') || '[]');
+            const nomesObrasPermitidas = obrasUser.filter(o => {
+                if(currentUser.level === 5 || currentUser.level === 8) return true;
+                const engs = Array.isArray(o.engenheiro) ? o.engenheiro : [o.engenheiro];
+                return engs.includes(currentUser.name);
+            }).map(o => o.nome);
+
+            if(obraSelecionada) {
+                pendencias = pendencias.filter(p => p.obra === obraSelecionada);
+            } else {
+                // Filtra apenas obras que o engenheiro tem acesso
+                pendencias = pendencias.filter(p => nomesObrasPermitidas.includes(p.obra) || p.obra === 'N/A');
+            }
+
+            if(pendencias.length === 0) {
+                document.getElementById('lista-aprovacoes').innerHTML = "<tr><td colspan='5' style='text-align:center;'>Sem pendências de Fiscalização ou Medição para esta seleção.</td></tr>"; 
+            } else {
+                document.getElementById('lista-aprovacoes').innerHTML = pendencias.map(p => `
+                    <tr>
+                        <td><strong>${p.id}</strong></td>
+                        <td>${p.obra}</td>
+                        <td>${p.data}</td>
+                        <td>${p.type}</td>
+                        <td>
+                            <button class="btn" style="background: #64748b; margin-right: 5px; padding: 2px 8px; font-size: 0.8rem;" onclick="previewPendencia('${p.type}', ${p.index})" title="Visualizar Detalhes"><i class="fas fa-eye"></i></button>
+                            <button class="btn btn-success" style="padding:2px 5px; font-size:0.8rem;" onclick="aprovarPendencia('${p.type}', ${p.index})">Aprovar</button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        // Função de Aprovação (Reparada)
+        function aprovarPendencia(type, index) {
+            requestJustification("Aprovação de Documento (" + type + ")", () => {
+                let dbName = '';
+                if (type === 'Checklist') dbName = 'checklists';
+                else if (type === 'Relatório Fotográfico') dbName = 'db_fotos_gps';
+                else if (type === 'Ocorrência Técnica') dbName = 'db_ocorrencias_fiscal';
+                else if (type === 'Medição') dbName = 'medicoes';
+                
+                if(dbName) {
+                    const db = JSON.parse(localStorage.getItem(dbName) || '[]');
+                    if(db[index]) {
+                        db[index].status = 'Aprovado'; // Marca como aprovado
+                        db[index].approvedBy = currentUser.name;
+                        db[index].approvedAt = new Date().toLocaleString();
+                        localStorage.setItem(dbName, JSON.stringify(db));
+                        alert("Documento Aprovado com Sucesso!");
+                        renderAprovacoes(); // Atualiza a lista para remover o item
+                    }
+                }
+            });
+        }
+
+        // Função de Preview no Fluxo de Aprovação (Atualizada para os novos tipos)
+        function previewPendencia(type, index) {
+            const content = document.getElementById('print-content');
+            
+            if (type === 'Checklist') {
+                const db = JSON.parse(localStorage.getItem('checklists') || '[]');
+                const item = db[index];
+                if(item) {
+                    const fotos = item.fotosInfo ? `<div style="margin-top:10px; font-style:italic;">${item.fotosInfo}</div>` : '';
+                    content.innerHTML = `
+                        <h2>Checklist Digital</h2>
+                        <hr>
+                        <p><strong>Obra:</strong> ${item.obra}</p>
+                        <p><strong>Ref. Técnica:</strong> ${item.refTecnica || '-'}</p>
+                        <p><strong>Parecer Técnico:</strong> ${item.parecer || '-'}</p>
+                        <p><strong>Justificativa:</strong> ${item.justificativa || '-'}</p>
+                        <p><strong>Recebimento:</strong> ${item.recebimento || '-'}</p>
+                        <p><strong>Tipo de Inspeção:</strong> ${item.tipo}</p>
+                        <p><strong>Data:</strong> ${item.data}</p>
+                        <p><strong>Obs:</strong> ${item.obsParecer || '-'}</p>
+                        ${fotos}
+                        <div style="margin-top:15px; padding:10px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px;">
+                            <p style="color:var(--success); font-weight:bold;"><i class="fas fa-check-circle"></i> Checklist Concluído</p>
+                            <small>Todos os itens verificados pelo Fiscal.</small>
+                        </div>
+                    `;
+                }
+            } else if (type === 'Relatório Fotográfico') {
+                const db = JSON.parse(localStorage.getItem('db_fotos_gps') || '[]');
+                const item = db[index];
+                if(item) {
+                    content.innerHTML = `
+                        <h2>Relatório Fotográfico (GPS)</h2>
+                        <hr>
+                        <p><strong>Obra:</strong> ${item.obra}</p>
+                        <p><strong>Descrição:</strong> ${item.desc}</p>
+                        <p><strong>Data:</strong> ${item.data}</p>
+                        <p><strong>Coordenadas GPS:</strong> ${item.gps}</p>
+                        <div style="margin-top:15px; border:1px dashed #ccc; height:150px; display:flex; align-items:center; justify-content:center; color:#999;">
+                            [Simulação: Fotos Anexadas Aqui]
+                        </div>
+                    `;
+                }
+            } else if (type === 'Ocorrência Técnica') {
+                const db = JSON.parse(localStorage.getItem('db_ocorrencias_fiscal') || '[]');
+                const item = db[index];
+                if(item) {
+                    content.innerHTML = `
+                        <h2 style="color:var(--danger);">Ocorrência Técnica</h2>
+                        <hr>
+                        <p><strong>Obra:</strong> ${item.obra}</p>
+                        <p><strong>Assunto:</strong> ${item.assunto}</p>
+                        <p><strong>Data:</strong> ${item.data}</p>
+                        <div style="margin-top:15px; padding:15px; background:#fef2f2; border:1px solid #fecaca; border-radius:8px;">
+                            <p><strong>Observação Detalhada:</strong></p>
+                            <p>${item.obs || 'Sem detalhes.'}</p>
+                        </div>
+                    `;
+                }
+            } else if (type === 'Medição') {
+                const db = JSON.parse(localStorage.getItem('medicoes') || '[]');
+                const item = db[index];
+                if(item) {
+                    content.innerHTML = `
+                        <h2>Medição de Serviço</h2>
+                        <hr>
+                        <p><strong>Obra:</strong> ${item.obra}</p>
+                        <p><strong>Item Medido:</strong> ${item.item}</p>
+                        <p><strong>Data:</strong> ${item.data}</p>
+                        <div style="margin-top:15px; padding:15px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px;">
+                            <p style="font-size:1.5rem; color:var(--accent); font-weight:bold;">Qtd: ${item.qtd}</p>
+                            <p><strong>Obs:</strong> ${item.obs || '-'}</p>
+                        </div>
+                    `;
+                }
+            }
+            
+            document.getElementById('print-modal').style.display = 'block';
+        }
+
+        function atualizarCronogramaVisual() {
+            const select = document.getElementById('cronograma-obra');
+            const obraSelecionada = select.value;
+            const barFill = document.getElementById('progresso-bar-fill');
+            const barText = document.getElementById('progresso-valor');
+            const barStatus = document.getElementById('progresso-status');
+
+            if (!obraSelecionada) {
+                // Estado padrão
+                barFill.style.width = "0%";
+                barText.innerText = "0% Concluído";
+                barStatus.innerText = "Selecione uma Obra";
+                barStatus.style.color = "var(--text-muted)";
+                return;
+            }
+
+            // Simulação Determinística de Progresso baseada no nome da obra
+            let hash = 0;
+            for (let i = 0; i < obraSelecionada.length; i++) {
+                hash = obraSelecionada.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            let progress = Math.abs(hash % 100); 
+            if(progress < 10) progress = 15; // Mínimo visual
+
+            // Simular status
+            const statusOptions = ['No Prazo', 'Adiantado', 'Atenção'];
+            const statusColors = ['var(--success)', 'var(--accent)', 'var(--warning)'];
+            const statusIdx = Math.abs(hash % 3);
+
+            // Atualizar DOM
+            barFill.style.width = progress + "%";
+            barText.innerText = progress + "% Concluído";
+            barStatus.innerText = statusOptions[statusIdx];
+            barStatus.style.color = statusColors[statusIdx];
+            
+            // Ajustar cor da barra se for 'Atenção'
+            if(statusIdx === 2) barFill.style.background = "#f59e0b";
+            else barFill.style.background = "var(--accent)";
+        }
+        
+        function renderChartFiscal() { new Chart(document.getElementById('chartFiscal').getContext('2d'), {type:'line', data:{labels:['Jan','Fev'], datasets:[{label:'%', data:[10,40]}]}}); }
+        function renderChartPerformance() { new Chart(document.getElementById('chartPerformance').getContext('2d'), {type:'bar', data:{labels:['KPI'], datasets:[{label:'%', data:[85]}]}}); }
+        function registrarMovimentoMaterial() { const nome = document.querySelector('#eng-materiais input[type="text"]').value; const tipo = document.querySelector('#eng-materiais select').value; const qtd = parseFloat(document.querySelector('#eng-materiais input[type="number"]').value); if(!nome || !qtd) return alert("Preencha"); let estoque = JSON.parse(localStorage.getItem('materiais')); let item = estoque.find(i => i.nome === nome); if (!item) { item = { nome: nome, qtd: 0 }; estoque.push(item); } else { item = estoque.find(i => i.nome === nome); } if (tipo === 'Entrada') item.qtd += qtd; else item.qtd -= qtd; localStorage.setItem('materiais', JSON.stringify(estoque)); renderEstoque(); alert("OK"); }
+        function renderEstoque() { const e = JSON.parse(localStorage.getItem('materiais')); document.getElementById('lista-materiais').innerHTML = e.map(i=>`<tr><td>${i.nome}</td><td>${i.qtd}</td><td>${i.qtd<10?'Baixo':'OK'}</td></tr>`).join(''); }
+        
+        // --- FUNÇÕES DE BACKUP E EXPORTAÇÃO ---
+        function exportarDados() { const b = new Blob([JSON.stringify(localStorage)], {type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='bkp.json'; a.click(); }
+        function importarDados() { const i=document.createElement('input'); i.type='file'; i.onchange=e=>{ const r=new FileReader(); r.onload=ev=>{ Object.assign(localStorage, JSON.parse(ev.target.result)); location.reload(); }; r.readAsText(e.target.files[0]); }; i.click(); }
+        
+        function exportarExcel() {
+            const wb = XLSX.utils.book_new();
+            
+            // 1. Obras
+            const obras = JSON.parse(localStorage.getItem('obras') || '[]');
+            // Converter Arrays para String para exibição correta no Excel
+            const obrasFormatadas = obras.map(o => ({
+                ...o,
+                engenheiro: Array.isArray(o.engenheiro) ? o.engenheiro.join(", ") : o.engenheiro,
+                fiscal: Array.isArray(o.fiscal) ? o.fiscal.join(", ") : o.fiscal,
+                fotoBase64: 'Imagem (Omitida)'
+            }));
+            const wsObras = XLSX.utils.json_to_sheet(obrasFormatadas);
+            XLSX.utils.book_append_sheet(wb, wsObras, "Obras");
+
+            // 2. Usuários
+            const users = JSON.parse(localStorage.getItem('usuarios') || '{}');
+            const usersArray = Object.keys(users).map(k => ({
+                usuario: k,
+                telefone: users[k].phone || '-',
+                nivel: users[k].level,
+                permissoes: users[k].permissions ? users[k].permissions.join(", ") : ''
+            }));
+            const wsUsers = XLSX.utils.json_to_sheet(usersArray);
+            XLSX.utils.book_append_sheet(wb, wsUsers, "Usuários");
+
+            // 3. RDOs
+            const rdos = JSON.parse(localStorage.getItem('relatorios') || '[]');
+            const wsRDO = XLSX.utils.json_to_sheet(rdos.map(r => ({...r, assinatura: 'Assinado'}))); // Simplifica assinatura
+            XLSX.utils.book_append_sheet(wb, wsRDO, "RDOs");
+
+            // 4. Checklists
+            const chk = JSON.parse(localStorage.getItem('checklists') || '[]');
+            const wsChk = XLSX.utils.json_to_sheet(chk);
+            XLSX.utils.book_append_sheet(wb, wsChk, "Checklists");
+            
+            // 5. Materiais
+            const mat = JSON.parse(localStorage.getItem('materiais') || '[]');
+            const wsMat = XLSX.utils.json_to_sheet(mat);
+            XLSX.utils.book_append_sheet(wb, wsMat, "Materiais");
+
+            XLSX.writeFile(wb, "Relatorio_Geral_Sistema.xlsx");
+        }
+
+        function exportarPDFSistema() {
+            // Gera um relatório sintético para PDF
+            const container = document.createElement('div');
+            container.style.padding = '20px';
+            container.style.fontFamily = 'Arial';
+            
+            const users = JSON.parse(localStorage.getItem('usuarios') || '{}');
+            const obras = JSON.parse(localStorage.getItem('obras') || '[]');
+            const rdos = JSON.parse(localStorage.getItem('relatorios') || '[]');
+
+            let html = `<h1 style="color:#475569; text-align:center;">Relatório Geral do Sistema</h1>`;
+            html += `<p style="text-align:center; color:#666;">Data: ${new Date().toLocaleString()}</p><hr>`;
+            
+            html += `<h3>Resumo</h3><ul>`;
+            html += `<li>Total de Usuários: ${Object.keys(users).length}</li>`;
+            html += `<li>Total de Obras: ${obras.length}</li>`;
+            html += `<li>Total de RDOs: ${rdos.length}</li></ul>`;
+
+            html += `<h3>Obras Ativas</h3><table border="1" cellpadding="5" cellspacing="0" style="width:100%; border-collapse:collapse;">
+                    <tr style="background:#eee;"><th>Nome</th><th>Contrato</th><th>Prazo</th></tr>`;
+            obras.forEach(o => {
+                html += `<tr><td>${o.nome}</td><td>R$ ${o.valorContrato || '-'}</td><td>${o.prazo || '-'}</td></tr>`;
+            });
+            html += `</table>`;
+
+            html += `<h3>Usuários Cadastrados</h3><table border="1" cellpadding="5" cellspacing="0" style="width:100%; border-collapse:collapse; margin-top:10px;">
+                    <tr style="background:#eee;"><th>Login</th><th>Nível</th><th>Telefone</th></tr>`;
+            for(let u in users) {
+                html += `<tr><td>${u}</td><td>${users[u].level}</td><td>${users[u].phone || '-'}</td></tr>`;
+            }
+            html += `</table>`;
+
+            container.innerHTML = html;
+
+            html2pdf().from(container).set({
+                margin: 10,
+                filename: 'Resumo_Sistema_DiarioPro.pdf',
+                html2canvas: { scale: 2 },
+                jsPDF: { orientation: 'portrait' }
+            }).save();
+        }
+
+        function limparTudo() { localStorage.clear(); location.reload(); }
+        function logout() { location.reload(); }
+    </script>
+</body>
+</html>
